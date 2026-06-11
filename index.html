@@ -114,7 +114,7 @@ header h1 span{color:var(--accent)}
 <script>
 const LS_KEY = 'focusTube.playlistId';
 const LS_CACHE = 'focusTube.cache.';
-let player = null, videoIds = [], currentIdx = -1, apiReady = false, pendingPl = null;
+let player = null, videoIds = [], currentIdx = -1, apiReady = false, pendingPl = null, manualMode = false;
 const $ = id => document.getElementById(id);
 
 function extractId(input){
@@ -219,17 +219,29 @@ function renderList(titles){
   });
 }
 
-function playAt(i){
+function playAt(i, scroll){
+  if (i < 0 || i >= videoIds.length) return;
+  manualMode = true;
   currentIdx = i;
-  player.playVideoAt(i);
+  player.loadVideoById(videoIds[i]);
   updatePlaying();
-  window.scrollTo({top:0, behavior:'smooth'});
+  if (scroll !== false) window.scrollTo({top:0, behavior:'smooth'});
 }
 
 function onPlayerState(e){
   if (e.data === YT.PlayerState.PLAYING){
-    const idx = player.getPlaylistIndex();
-    if (idx !== currentIdx){ currentIdx = idx; updatePlaying(); }
+    // 今実際に再生している動画に合わせてリストのハイライトを同期
+    try{
+      const m = player.getVideoUrl().match(/[?&]v=([A-Za-z0-9_-]+)/);
+      if (m){
+        const idx = videoIds.indexOf(m[1]);
+        if (idx !== -1 && idx !== currentIdx){ currentIdx = idx; updatePlaying(); }
+      }
+    }catch(err){}
+  }
+  if (e.data === YT.PlayerState.ENDED && manualMode){
+    // 動画が終わったら次の動画へ自動で進む
+    if (currentIdx > -1 && currentIdx < videoIds.length - 1) playAt(currentIdx + 1, false);
   }
 }
 
