@@ -126,7 +126,7 @@ header a{color:var(--sub);font-size:13px;text-decoration:none;border:1px solid v
   <div id="vTitle">読み込み中…</div>
   <div id="bgState">
     <span id="bgDot"></span>
-    <span id="bgText">バックグラウンド再生は<b>ON</b>。画面を消すと止まる場合は、戻ったとき自動で再開します。</span>
+    <span id="bgText">BG: <b>ON</b>。再生中は<b>画面を消さず</b>に流し続けます(自動ロックで止まるのを防止)。</span>
   </div>
   <div id="stats">
     <div class="stat total"><div class="k">累計再生時間</div><div class="v" id="totalV">0<small>秒</small></div></div>
@@ -151,8 +151,8 @@ header a{color:var(--sub);font-size:13px;text-decoration:none;border:1px solid v
 
 <div id="note">
   <div class="card">
-    <span class="tag">仕組み</span>音声セッションを保持し、<b>MediaSession</b>でロック画面の操作に対応。タブやアプリに戻った瞬間に再生位置から再開します。<br><br>
-    <span class="tag">注意</span>iPhoneのSafariなどブラウザによっては、画面ロック中の<b>完全な裏再生はOS側で制限</b>されます。その場合はロック画面のメディア操作から再生してください。Android Chrome / PCではより安定して裏で鳴り続けます。
+    <span class="tag">仕組み</span>BG: ON の間は、再生中に<b>画面の自動消灯を防止</b>(Wake Lock)。これで「机に置いて数分で勝手に止まる」を防ぎます。電池を使うので、不要なときは BG: OFF に。<br><br>
+    <span class="tag">注意</span>WebのYouTubeは、<b>画面を消す/他アプリに切り替えると再生が止まります</b>(完全な裏再生はOS・YouTube側の制限で不可。これは本来Premiumの機能です)。戻れば自動で再生を再開します。画面を消したまま鳴らし続けたい場合は <b>YouTube Premium</b> が必要です。
   </div>
 </div>
 
@@ -301,7 +301,7 @@ function onState(e){
     $('poster').classList.add('hide');
     $('playPause').textContent = '⏸ 一時停止';
     setBgDot(true);
-    if (bgEnabled) startSilence();
+    if (bgEnabled){ startSilence(); acquireWake(); }
     updateMediaSession('playing');
     startPositionSync();
     startTiming();
@@ -312,6 +312,7 @@ function onState(e){
     updateMediaSession('paused');
     stopPositionSync();
     stopTiming();
+    releaseWake();
   } else if (e.data === YT.PlayerState.ENDED){
     isPlaying = false;
     $('playPause').textContent = '▶ 再生';
@@ -319,6 +320,7 @@ function onState(e){
     stopSilence();
     stopPositionSync();
     stopTiming();
+    releaseWake();
   }
 }
 
@@ -348,10 +350,24 @@ function startSilence(){
 }
 function stopSilence(){ try{ silence.pause(); }catch(e){} }
 
+// 画面ロック(自動消灯)を防ぐ = 数分で勝手に止まるのを回避
+let wakeLock = null;
+async function acquireWake(){
+  if (!('wakeLock' in navigator) || !bgEnabled) return;
+  try{
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => { wakeLock = null; });
+  }catch(e){}
+}
+async function releaseWake(){
+  try{ if (wakeLock){ const w = wakeLock; wakeLock = null; await w.release(); } }catch(e){}
+}
+
 document.addEventListener('visibilitychange', () => {
   flushTime(); // 背景に回る/戻る瞬間に経過分を確定
   if (document.visibilityState === 'visible' && bgEnabled && isPlaying && player){
     try{ if (player.getPlayerState() !== YT.PlayerState.PLAYING) player.playVideo(); }catch(e){}
+    acquireWake(); // Wake Lockは非表示で解除されるので戻ったら取り直す
   }
 });
 window.addEventListener('pagehide', flushTime);
@@ -408,9 +424,10 @@ $('bgToggle').onclick = () => {
   b.classList.toggle('on', bgEnabled);
   b.textContent = bgEnabled ? '🌙 BG: ON' : '🌙 BG: OFF';
   $('bgText').innerHTML = bgEnabled
-    ? 'バックグラウンド再生は<b>ON</b>。画面を消すと止まる場合は、戻ったとき自動で再開します。'
-    : 'バックグラウンド再生は<b>OFF</b>。画面を消すと再生も止まります。';
-  if (bgEnabled && isPlaying) startSilence(); else stopSilence();
+    ? 'BG: <b>ON</b>。再生中は<b>画面を消さず</b>に流し続けます(自動ロックで止まるのを防止)。'
+    : 'BG: <b>OFF</b>。画面が自動でロックされると再生も止まります。';
+  if (bgEnabled && isPlaying){ startSilence(); acquireWake(); }
+  else { stopSilence(); releaseWake(); }
 };
 $('replay').onclick = () => { if(player){ player.seekTo(0, true); player.playVideo(); } };
 $('resetBtn').onclick = () => {
