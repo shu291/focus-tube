@@ -364,10 +364,21 @@ async function releaseWake(){
 }
 
 document.addEventListener('visibilitychange', () => {
-  flushTime(); // 背景に回る/戻る瞬間に経過分を確定
-  if (document.visibilityState === 'visible' && bgEnabled && isPlaying && player){
-    try{ if (player.getPlayerState() !== YT.PlayerState.PLAYING) player.playVideo(); }catch(e){}
-    acquireWake(); // Wake Lockは非表示で解除されるので戻ったら取り直す
+  flushTime(); // 背景に回る/戻る瞬間に経過分を確定(時刻差分なので止めてもズレない)
+  if (document.visibilityState === 'hidden'){
+    // バックグラウンドでは毎秒のタイマーを止める。
+    // 裏で動き続けるとスマホがタブを早期に凍結/破棄して再生が止まりやすいため。
+    if (statsTimer){ clearInterval(statsTimer); statsTimer = null; }
+    stopPositionSync();
+  } else if (document.visibilityState === 'visible'){
+    if (bgEnabled && isPlaying && player){
+      try{ if (player.getPlayerState() !== YT.PlayerState.PLAYING) player.playVideo(); }catch(e){}
+      acquireWake(); // Wake Lockは非表示で解除されるので戻ったら取り直す
+    }
+    if (isPlaying){               // 表示に戻ったら計測・表示を再開
+      if (!statsTimer) statsTimer = setInterval(flushTime, 1000);
+      startPositionSync();
+    }
   }
 });
 window.addEventListener('pagehide', flushTime);
