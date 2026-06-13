@@ -67,6 +67,15 @@ header a{color:var(--sub);font-size:13px;text-decoration:none;border:1px solid v
 #bgText{font-size:13px;color:var(--sub);line-height:1.6}
 #bgText b{color:var(--text)}
 
+#stats{margin-top:14px;display:flex;gap:10px}
+#stats .stat{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 10px;text-align:center}
+#stats .stat .k{font-size:11px;color:var(--sub);letter-spacing:.04em}
+#stats .stat .v{font-size:19px;font-weight:700;margin-top:5px;font-variant-numeric:tabular-nums}
+#stats .stat .v small{font-size:12px;color:var(--sub);font-weight:600;margin:0 1px}
+#stats .stat.total .v{color:var(--accent)}
+#resetWrap{text-align:right;margin-top:8px}
+#resetBtn{background:none;border:none;color:var(--sub);font-size:12px;cursor:pointer;text-decoration:underline;padding:2px 4px}
+
 .controls{max-width:680px;margin:16px auto 0;padding:0 16px;display:flex;gap:10px}
 .controls button{
   flex:1;background:var(--panel2);color:var(--text);border:1px solid var(--line);
@@ -106,6 +115,11 @@ header a{color:var(--sub);font-size:13px;text-decoration:none;border:1px solid v
     <span id="bgDot"></span>
     <span id="bgText">バックグラウンド再生は<b>ON</b>。画面を消すと止まる場合は、戻ったとき自動で再開します。</span>
   </div>
+  <div id="stats">
+    <div class="stat total"><div class="k">累計再生時間</div><div class="v" id="totalV">0<small>秒</small></div></div>
+    <div class="stat"><div class="k">今日</div><div class="v" id="todayV">0<small>秒</small></div></div>
+  </div>
+  <div id="resetWrap"><button id="resetBtn">累計をリセット</button></div>
 </div>
 
 <div class="controls">
@@ -134,6 +148,50 @@ let currentTitle = '';
 let bgEnabled = true, isPlaying = false, posTimer = null;
 const $ = id => document.getElementById(id);
 const silence = $('silence');
+
+/* ---- 累計再生時間の集計 ---- */
+const T_TOTAL='focusTube.single.totalSec', T_DATE='focusTube.single.todayDate', T_TODAY='focusTube.single.todaySec';
+let totalSec = parseFloat(localStorage.getItem(T_TOTAL)) || 0;
+let todaySec = parseFloat(localStorage.getItem(T_TODAY)) || 0;
+let todayDate = localStorage.getItem(T_DATE) || '';
+let playStart = null, statsTimer = null;
+
+const dayKey = () => new Date().toLocaleDateString('sv'); // YYYY-MM-DD(ローカル日付)
+
+function rollDay(){
+  const d = dayKey();
+  if (todayDate !== d){ todayDate = d; todaySec = 0; }
+}
+function flushTime(){
+  if (playStart == null) return;
+  const now = Date.now();
+  const add = (now - playStart) / 1000;   // 実時刻の差分なので背景で間引かれても正確
+  playStart = now;
+  if (add <= 0) return;
+  rollDay();
+  totalSec += add; todaySec += add;
+  try{
+    localStorage.setItem(T_TOTAL, totalSec);
+    localStorage.setItem(T_TODAY, todaySec);
+    localStorage.setItem(T_DATE, todayDate);
+  }catch(e){}
+  renderStats();
+}
+function startTiming(){ playStart = Date.now(); if(!statsTimer) statsTimer = setInterval(flushTime, 1000); }
+function stopTiming(){ flushTime(); playStart = null; if(statsTimer){ clearInterval(statsTimer); statsTimer = null; } }
+
+function fmt(sec){
+  sec = Math.floor(sec);
+  const h = Math.floor(sec/3600), m = Math.floor(sec%3600/60), s = sec%60;
+  if (h > 0) return h+'<small>時間</small>'+m+'<small>分</small>';
+  if (m > 0) return m+'<small>分</small>'+s+'<small>秒</small>';
+  return s+'<small>秒</small>';
+}
+function renderStats(){
+  rollDay();
+  $('totalV').innerHTML = fmt(totalSec);
+  $('todayV').innerHTML = fmt(todaySec);
+}
 
 // IFRAME API
 const tag = document.createElement('script');
@@ -173,18 +231,21 @@ function onState(e){
     if (bgEnabled) startSilence();
     updateMediaSession('playing');
     startPositionSync();
+    startTiming();
   } else if (e.data === YT.PlayerState.PAUSED){
     isPlaying = false;
     $('playPause').textContent = '▶ 再生';
     setBgDot(false);
     updateMediaSession('paused');
     stopPositionSync();
+    stopTiming();
   } else if (e.data === YT.PlayerState.ENDED){
     isPlaying = false;
     $('playPause').textContent = '▶ 再生';
     setBgDot(false);
     stopSilence();
     stopPositionSync();
+    stopTiming();
   }
 }
 
@@ -215,10 +276,13 @@ function startSilence(){
 function stopSilence(){ try{ silence.pause(); }catch(e){} }
 
 document.addEventListener('visibilitychange', () => {
+  flushTime(); // 背景に回る/戻る瞬間に経過分を確定
   if (document.visibilityState === 'visible' && bgEnabled && isPlaying && player){
     try{ if (player.getPlayerState() !== YT.PlayerState.PLAYING) player.playVideo(); }catch(e){}
   }
 });
+window.addEventListener('pagehide', flushTime);
+window.addEventListener('beforeunload', flushTime);
 
 // MediaSession(ロック画面 / 通知のメディア操作)
 function setMediaMetadata(){
@@ -276,7 +340,20 @@ $('bgToggle').onclick = () => {
   if (bgEnabled && isPlaying) startSilence(); else stopSilence();
 };
 $('replay').onclick = () => { if(player){ player.seekTo(0, true); player.playVideo(); } };
+$('resetBtn').onclick = () => {
+  if (!confirm('累計再生時間をリセットしますか?')) return;
+  stopTiming();
+  totalSec = 0; todaySec = 0; todayDate = dayKey();
+  try{
+    localStorage.setItem(T_TOTAL, 0);
+    localStorage.setItem(T_TODAY, 0);
+    localStorage.setItem(T_DATE, todayDate);
+  }catch(e){}
+  renderStats();
+  if (isPlaying) startTiming(); // 再生中ならそのまま計測継続
+};
 
+renderStats();
 setupMediaHandlers();
 </script>
 </body>
