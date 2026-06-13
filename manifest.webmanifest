@@ -1,0 +1,14 @@
+{
+  "name": "FocusTube",
+  "short_name": "FocusTube",
+  "description": "選んだYouTube動画を1本だけバックグラウンド再生",
+  "start_url": "./background-player.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d1117",
+  "theme_color": "#0d1117",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
