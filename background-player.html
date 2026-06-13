@@ -73,6 +73,19 @@ header a{color:var(--sub);font-size:13px;text-decoration:none;border:1px solid v
 #stats .stat .v{font-size:19px;font-weight:700;margin-top:5px;font-variant-numeric:tabular-nums}
 #stats .stat .v small{font-size:12px;color:var(--sub);font-weight:600;margin:0 1px}
 #stats .stat.total .v{color:var(--accent)}
+
+#chartCard{margin-top:12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+#chartTabs{display:flex;gap:6px;margin-bottom:14px}
+#chartTabs .tab{flex:1;background:var(--panel2);border:1px solid var(--line);color:var(--sub);border-radius:8px;padding:8px;font-size:13px;font-weight:600;cursor:pointer}
+#chartTabs .tab.on{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
+#chart{display:flex;align-items:flex-end;gap:6px;height:152px}
+#chart .col{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;min-width:0}
+#chart .bval{font-size:10px;color:var(--sub);margin-bottom:4px;height:12px;white-space:nowrap;font-variant-numeric:tabular-nums}
+#chart .barwrap{flex:1;width:100%;display:flex;align-items:flex-end;justify-content:center}
+#chart .bar{width:72%;max-width:34px;min-height:2px;background:linear-gradient(180deg,var(--accent),#2b7fb8);border-radius:5px 5px 0 0;transition:height .3s}
+#chart .col.zero .bar{background:var(--line)}
+#chart .blab{font-size:10.5px;color:var(--sub);margin-top:6px;white-space:nowrap}
+
 #resetWrap{text-align:right;margin-top:8px}
 #resetBtn{background:none;border:none;color:var(--sub);font-size:12px;cursor:pointer;text-decoration:underline;padding:2px 4px}
 
@@ -119,7 +132,15 @@ header a{color:var(--sub);font-size:13px;text-decoration:none;border:1px solid v
     <div class="stat total"><div class="k">累計再生時間</div><div class="v" id="totalV">0<small>秒</small></div></div>
     <div class="stat"><div class="k">今日</div><div class="v" id="todayV">0<small>秒</small></div></div>
   </div>
-  <div id="resetWrap"><button id="resetBtn">累計をリセット</button></div>
+  <div id="chartCard">
+    <div id="chartTabs">
+      <button class="tab on" data-m="day">日</button>
+      <button class="tab" data-m="week">週</button>
+      <button class="tab" data-m="month">月</button>
+    </div>
+    <div id="chart"></div>
+  </div>
+  <div id="resetWrap"><button id="resetBtn">記録をリセット</button></div>
 </div>
 
 <div class="controls">
@@ -149,32 +170,31 @@ let bgEnabled = true, isPlaying = false, posTimer = null;
 const $ = id => document.getElementById(id);
 const silence = $('silence');
 
-/* ---- 累計再生時間の集計 ---- */
-const T_TOTAL='focusTube.single.totalSec', T_DATE='focusTube.single.todayDate', T_TODAY='focusTube.single.todaySec';
-let totalSec = parseFloat(localStorage.getItem(T_TOTAL)) || 0;
-let todaySec = parseFloat(localStorage.getItem(T_TODAY)) || 0;
-let todayDate = localStorage.getItem(T_DATE) || '';
-let playStart = null, statsTimer = null;
+/* ---- 再生時間の記録(日別)---- */
+const DAYS_KEY = 'focusTube.single.days';
+let days = {};
+try{ days = JSON.parse(localStorage.getItem(DAYS_KEY)) || {}; }catch(e){ days = {}; }
+let playStart = null, statsTimer = null, chartMode = 'day';
 
-const dayKey = () => new Date().toLocaleDateString('sv'); // YYYY-MM-DD(ローカル日付)
+const dayKey = d => (d || new Date()).toLocaleDateString('sv'); // YYYY-MM-DD(ローカル日付)
+function saveDays(){ try{ localStorage.setItem(DAYS_KEY, JSON.stringify(days)); }catch(e){} }
 
-function rollDay(){
-  const d = dayKey();
-  if (todayDate !== d){ todayDate = d; todaySec = 0; }
-}
+// 旧バージョンの累計データがあれば引き継ぐ
+(function migrate(){
+  if (Object.keys(days).length) return;
+  const old = parseFloat(localStorage.getItem('focusTube.single.totalSec'));
+  if (old > 0){ days[dayKey()] = old; saveDays(); }
+})();
+
 function flushTime(){
   if (playStart == null) return;
   const now = Date.now();
   const add = (now - playStart) / 1000;   // 実時刻の差分なので背景で間引かれても正確
   playStart = now;
   if (add <= 0) return;
-  rollDay();
-  totalSec += add; todaySec += add;
-  try{
-    localStorage.setItem(T_TOTAL, totalSec);
-    localStorage.setItem(T_TODAY, todaySec);
-    localStorage.setItem(T_DATE, todayDate);
-  }catch(e){}
+  const k = dayKey();
+  days[k] = (days[k] || 0) + add;
+  saveDays();
   renderStats();
 }
 function startTiming(){ playStart = Date.now(); if(!statsTimer) statsTimer = setInterval(flushTime, 1000); }
@@ -187,10 +207,63 @@ function fmt(sec){
   if (m > 0) return m+'<small>分</small>'+s+'<small>秒</small>';
   return s+'<small>秒</small>';
 }
+function fmtShort(sec){
+  if (sec >= 3600){ const h = sec/3600; return (h >= 10 ? Math.round(h) : (Math.round(h*10)/10)) + 'h'; }
+  if (sec >= 60) return Math.round(sec/60) + 'm';
+  return Math.round(sec) + 's';
+}
+
+// ---- 集計 ----
+function lastDays(n){
+  const arr = [];
+  for (let i = n-1; i >= 0; i--){
+    const d = new Date(); d.setDate(d.getDate() - i);
+    arr.push({ label:(d.getMonth()+1)+'/'+d.getDate(), sec: days[dayKey(d)] || 0 });
+  }
+  return arr;
+}
+function weekStart(date){
+  const x = new Date(date); const dow = (x.getDay()+6) % 7; // 月曜始まり
+  x.setDate(x.getDate() - dow); x.setHours(0,0,0,0); return x;
+}
+function lastWeeks(n){
+  const arr = []; const cur = weekStart(new Date());
+  for (let i = n-1; i >= 0; i--){
+    const ws = new Date(cur); ws.setDate(ws.getDate() - i*7);
+    let sec = 0;
+    for (let j = 0; j < 7; j++){ const d = new Date(ws); d.setDate(d.getDate()+j); sec += days[dayKey(d)] || 0; }
+    arr.push({ label:(ws.getMonth()+1)+'/'+ws.getDate(), sec });
+  }
+  return arr;
+}
+function lastMonths(n){
+  const arr = []; const now = new Date();
+  for (let i = n-1; i >= 0; i--){
+    const m = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    const prefix = dayKey(m).slice(0,7); // YYYY-MM
+    let sec = 0;
+    for (const k in days){ if (k.slice(0,7) === prefix) sec += days[k]; }
+    arr.push({ label:(m.getMonth()+1)+'月', sec });
+  }
+  return arr;
+}
+
+function renderChart(){
+  const data = chartMode==='day' ? lastDays(7) : chartMode==='week' ? lastWeeks(6) : lastMonths(6);
+  const max = Math.max(1, ...data.map(d => d.sec));
+  $('chart').innerHTML = data.map(d => {
+    const h = d.sec > 0 ? Math.max(4, Math.round(d.sec/max*100)) : 0;
+    return '<div class="col'+(d.sec>0?'':' zero')+'">'+
+      '<div class="bval">'+(d.sec>0 ? fmtShort(d.sec) : '')+'</div>'+
+      '<div class="barwrap"><div class="bar" style="height:'+h+'%"></div></div>'+
+      '<div class="blab">'+d.label+'</div></div>';
+  }).join('');
+}
 function renderStats(){
-  rollDay();
-  $('totalV').innerHTML = fmt(totalSec);
-  $('todayV').innerHTML = fmt(todaySec);
+  const total = Object.values(days).reduce((a,b) => a+b, 0);
+  $('totalV').innerHTML = fmt(total);
+  $('todayV').innerHTML = fmt(days[dayKey()] || 0);
+  renderChart();
 }
 
 // IFRAME API
@@ -341,17 +414,20 @@ $('bgToggle').onclick = () => {
 };
 $('replay').onclick = () => { if(player){ player.seekTo(0, true); player.playVideo(); } };
 $('resetBtn').onclick = () => {
-  if (!confirm('累計再生時間をリセットしますか?')) return;
+  if (!confirm('すべての再生記録をリセットしますか?')) return;
   stopTiming();
-  totalSec = 0; todaySec = 0; todayDate = dayKey();
-  try{
-    localStorage.setItem(T_TOTAL, 0);
-    localStorage.setItem(T_TODAY, 0);
-    localStorage.setItem(T_DATE, todayDate);
-  }catch(e){}
+  days = {}; saveDays();
   renderStats();
   if (isPlaying) startTiming(); // 再生中ならそのまま計測継続
 };
+
+document.querySelectorAll('#chartTabs .tab').forEach(t => {
+  t.onclick = () => {
+    chartMode = t.dataset.m;
+    document.querySelectorAll('#chartTabs .tab').forEach(x => x.classList.toggle('on', x === t));
+    renderChart();
+  };
+});
 
 renderStats();
 setupMediaHandlers();
