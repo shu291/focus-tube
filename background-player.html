@@ -174,7 +174,7 @@ const silence = $('silence');
 const DAYS_KEY = 'focusTube.single.days';
 let days = {};
 try{ days = JSON.parse(localStorage.getItem(DAYS_KEY)) || {}; }catch(e){ days = {}; }
-let playStart = null, statsTimer = null, chartMode = 'day';
+let lastTick = null, statsTimer = null, chartMode = 'day';
 
 const dayKey = d => (d || new Date()).toLocaleDateString('sv'); // YYYY-MM-DD(ローカル日付)
 function saveDays(){ try{ localStorage.setItem(DAYS_KEY, JSON.stringify(days)); }catch(e){} }
@@ -186,19 +186,22 @@ function saveDays(){ try{ localStorage.setItem(DAYS_KEY, JSON.stringify(days)); 
   if (old > 0){ days[dayKey()] = old; saveDays(); }
 })();
 
-function flushTime(){
-  if (playStart == null) return;
-  const now = Date.now();
-  const add = (now - playStart) / 1000;   // 実時刻の差分なので背景で間引かれても正確
-  playStart = now;
-  if (add <= 0) return;
-  const k = dayKey();
-  days[k] = (days[k] || 0) + add;
-  saveDays();
-  renderStats();
+function isReallyPlaying(){
+  try{ return !!(player && player.getPlayerState && player.getPlayerState() === YT.PlayerState.PLAYING); }
+  catch(e){ return false; }
 }
-function startTiming(){ playStart = Date.now(); if(!statsTimer) statsTimer = setInterval(flushTime, 1000); }
-function stopTiming(){ flushTime(); playStart = null; if(statsTimer){ clearInterval(statsTimer); statsTimer = null; } }
+// 画面が見えている間だけ回るループ。実際に再生中のときだけ加算するので、
+// 開き直し(bfcache復帰)や再生/一時停止イベントの取りこぼしに左右されず、確実に動き続ける。
+function accumulate(){
+  const now = Date.now();
+  if (lastTick != null && isReallyPlaying()){
+    const add = (now - lastTick) / 1000;   // 実時刻の差分
+    if (add > 0){ const k = dayKey(); days[k] = (days[k] || 0) + add; saveDays(); renderStats(); }
+  }
+  lastTick = now;
+}
+function startStatsLoop(){ if (!statsTimer){ lastTick = Date.now(); statsTimer = setInterval(accumulate, 1000); } }
+function stopStatsLoop(){ accumulate(); if (statsTimer){ clearInterval(statsTimer); statsTimer = null; } lastTick = null; }
 
 function fmt(sec){
   sec = Math.floor(sec);
@@ -304,14 +307,14 @@ function onState(e){
     if (bgEnabled){ startSilence(); acquireWake(); }
     updateMediaSession('playing');
     startPositionSync();
-    startTiming();
+    startStatsLoop();
   } else if (e.data === YT.PlayerState.PAUSED){
     isPlaying = false;
     $('playPause').textContent = '▶ 再生';
     setBgDot(false);
     updateMediaSession('paused');
     stopPositionSync();
-    stopTiming();
+    accumulate();
     releaseWake();
   } else if (e.data === YT.PlayerState.ENDED){
     isPlaying = false;
@@ -319,7 +322,7 @@ function onState(e){
     setBgDot(false);
     stopSilence();
     stopPositionSync();
-    stopTiming();
+    accumulate();
     releaseWake();
   }
 }
@@ -363,26 +366,28 @@ async function releaseWake(){
   try{ if (wakeLock){ const w = wakeLock; wakeLock = null; await w.release(); } }catch(e){}
 }
 
+function onVisible(){
+  // 表示に戻ったら計測ループを必ず再開(開き直し対策の要)
+  startStatsLoop();
+  if (bgEnabled && isPlaying && player){
+    try{ if (player.getPlayerState() !== YT.PlayerState.PLAYING) player.playVideo(); }catch(e){}
+    acquireWake(); // Wake Lockは非表示で解除されるので戻ったら取り直す
+  }
+  if (isReallyPlaying()) startPositionSync();
+}
 document.addEventListener('visibilitychange', () => {
-  flushTime(); // 背景に回る/戻る瞬間に経過分を確定(時刻差分なので止めてもズレない)
   if (document.visibilityState === 'hidden'){
-    // バックグラウンドでは毎秒のタイマーを止める。
-    // 裏で動き続けるとスマホがタブを早期に凍結/破棄して再生が止まりやすいため。
-    if (statsTimer){ clearInterval(statsTimer); statsTimer = null; }
+    // バックグラウンドでは毎秒タイマーを止める(裏で動き続けると早期に凍結/破棄され再生が止まりやすい)
+    stopStatsLoop();
     stopPositionSync();
-  } else if (document.visibilityState === 'visible'){
-    if (bgEnabled && isPlaying && player){
-      try{ if (player.getPlayerState() !== YT.PlayerState.PLAYING) player.playVideo(); }catch(e){}
-      acquireWake(); // Wake Lockは非表示で解除されるので戻ったら取り直す
-    }
-    if (isPlaying){               // 表示に戻ったら計測・表示を再開
-      if (!statsTimer) statsTimer = setInterval(flushTime, 1000);
-      startPositionSync();
-    }
+  } else {
+    onVisible();
   }
 });
-window.addEventListener('pagehide', flushTime);
-window.addEventListener('beforeunload', flushTime);
+// bfcache から復帰したとき(iOSの開き直し等)も確実に再開させる
+window.addEventListener('pageshow', () => { if (document.visibilityState !== 'hidden') onVisible(); });
+window.addEventListener('pagehide', stopStatsLoop);
+window.addEventListener('beforeunload', () => accumulate());
 
 // MediaSession(ロック画面 / 通知のメディア操作)
 function setMediaMetadata(){
@@ -443,10 +448,8 @@ $('bgToggle').onclick = () => {
 $('replay').onclick = () => { if(player){ player.seekTo(0, true); player.playVideo(); } };
 $('resetBtn').onclick = () => {
   if (!confirm('すべての再生記録をリセットしますか?')) return;
-  stopTiming();
   days = {}; saveDays();
-  renderStats();
-  if (isPlaying) startTiming(); // 再生中ならそのまま計測継続
+  renderStats();   // 計測ループは回ったまま、再生中なら自動でまた積算される
 };
 
 document.querySelectorAll('#chartTabs .tab').forEach(t => {
@@ -459,6 +462,7 @@ document.querySelectorAll('#chartTabs .tab').forEach(t => {
 
 renderStats();
 setupMediaHandlers();
+if (document.visibilityState !== 'hidden') startStatsLoop(); // 起動時から計測ループを回す
 </script>
 </body>
 </html>
