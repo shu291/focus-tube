@@ -174,7 +174,7 @@ const silence = $('silence');
 const DAYS_KEY = 'focusTube.single.days';
 let days = {};
 try{ days = JSON.parse(localStorage.getItem(DAYS_KEY)) || {}; }catch(e){ days = {}; }
-let lastTick = null, statsTimer = null, chartMode = 'day';
+let lastCT = null, statsTimer = null, chartMode = 'day';
 
 const dayKey = d => (d || new Date()).toLocaleDateString('sv'); // YYYY-MM-DD(ローカル日付)
 function saveDays(){ try{ localStorage.setItem(DAYS_KEY, JSON.stringify(days)); }catch(e){} }
@@ -186,22 +186,28 @@ function saveDays(){ try{ localStorage.setItem(DAYS_KEY, JSON.stringify(days)); 
   if (old > 0){ days[dayKey()] = old; saveDays(); }
 })();
 
+function curTime(){
+  try{ return (player && player.getCurrentTime) ? player.getCurrentTime() : null; }
+  catch(e){ return null; }
+}
 function isReallyPlaying(){
   try{ return !!(player && player.getPlayerState && player.getPlayerState() === YT.PlayerState.PLAYING); }
   catch(e){ return false; }
 }
-// 画面が見えている間だけ回るループ。実際に再生中のときだけ加算するので、
-// 開き直し(bfcache復帰)や再生/一時停止イベントの取りこぼしに左右されず、確実に動き続ける。
+// 画面が見えている間だけ回るループ。動画の再生位置(getCurrentTime)が
+// 実際に進んだ秒数だけ加算するので、状態イベントに依存せずiOSでも確実に数えられる。
 function accumulate(){
-  const now = Date.now();
-  if (lastTick != null && isReallyPlaying()){
-    const add = (now - lastTick) / 1000;   // 実時刻の差分
-    if (add > 0){ const k = dayKey(); days[k] = (days[k] || 0) + add; saveDays(); renderStats(); }
+  const ct = curTime();
+  if (lastCT != null && ct != null){
+    const delta = ct - lastCT;          // 再生で進んだ秒数
+    if (delta > 0 && delta < 5){         // 通常再生のみ計上(シーク/ループ/巻き戻しは除外)
+      const k = dayKey(); days[k] = (days[k] || 0) + delta; saveDays(); renderStats();
+    }
   }
-  lastTick = now;
+  lastCT = ct;
 }
-function startStatsLoop(){ if (!statsTimer){ lastTick = Date.now(); statsTimer = setInterval(accumulate, 1000); } }
-function stopStatsLoop(){ accumulate(); if (statsTimer){ clearInterval(statsTimer); statsTimer = null; } lastTick = null; }
+function startStatsLoop(){ if (!statsTimer){ lastCT = null; statsTimer = setInterval(accumulate, 1000); } }
+function stopStatsLoop(){ accumulate(); if (statsTimer){ clearInterval(statsTimer); statsTimer = null; } lastCT = null; }
 
 function fmt(sec){
   sec = Math.floor(sec);
