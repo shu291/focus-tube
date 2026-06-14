@@ -174,7 +174,7 @@ const silence = $('silence');
 const DAYS_KEY = 'focusTube.single.days';
 let days = {};
 try{ days = JSON.parse(localStorage.getItem(DAYS_KEY)) || {}; }catch(e){ days = {}; }
-let lastCT = null, statsTimer = null, chartMode = 'day';
+let lastCT = null, lastWall = null, statsTimer = null, rafId = null, shownSec = -1, chartMode = 'day';
 
 const dayKey = d => (d || new Date()).toLocaleDateString('sv'); // YYYY-MM-DD(ローカル日付)
 function saveDays(){ try{ localStorage.setItem(DAYS_KEY, JSON.stringify(days)); }catch(e){} }
@@ -194,20 +194,34 @@ function isReallyPlaying(){
   try{ return !!(player && player.getPlayerState && player.getPlayerState() === YT.PlayerState.PLAYING); }
   catch(e){ return false; }
 }
-// 画面が見えている間だけ回るループ。動画の再生位置(getCurrentTime)が
-// 実際に進んだ秒数だけ加算するので、状態イベントに依存せずiOSでも確実に数えられる。
+// --- 計測(データ): 動画の再生位置と実時刻の「小さい方」だけ加算 ---
+// 通常再生は位置≈実時刻で正確に計上。早送りは実時刻に丸めて過剰計上を防ぎ、
+// 巻き戻し/ループ(負の差分)は除外。タイマーが多少間引かれても正確。
 function accumulate(){
-  const ct = curTime();
-  if (lastCT != null && ct != null){
-    const delta = ct - lastCT;          // 再生で進んだ秒数
-    if (delta > 0 && delta < 5){         // 通常再生のみ計上(シーク/ループ/巻き戻しは除外)
-      const k = dayKey(); days[k] = (days[k] || 0) + delta; saveDays(); renderStats();
-    }
+  const ct = curTime(), now = Date.now();
+  if (lastCT != null && lastWall != null && ct != null){
+    const add = Math.min(ct - lastCT, (now - lastWall) / 1000);
+    if (add > 0 && add < 60){ const k = dayKey(); days[k] = (days[k] || 0) + add; saveDays(); }
   }
-  lastCT = ct;
+  lastCT = ct; lastWall = now;
 }
-function startStatsLoop(){ if (!statsTimer){ lastCT = null; statsTimer = setInterval(accumulate, 1000); } }
-function stopStatsLoop(){ accumulate(); if (statsTimer){ clearInterval(statsTimer); statsTimer = null; } lastCT = null; }
+// --- 表示(描画): requestAnimationFrameで毎フレーム反映を強制 ---
+// iOS Safariは動画再生中にDOM再描画を抑制するため、描画パイプラインに同期して更新する。
+function paintLoop(){
+  rafId = requestAnimationFrame(paintLoop);
+  const sec = Math.floor(days[dayKey()] || 0);
+  if (sec !== shownSec){ shownSec = sec; renderStats(); }
+}
+function startStatsLoop(){
+  if (!statsTimer){ lastCT = null; lastWall = null; statsTimer = setInterval(accumulate, 1000); }
+  if (rafId == null){ shownSec = -1; rafId = requestAnimationFrame(paintLoop); }
+}
+function stopStatsLoop(){
+  accumulate();
+  if (statsTimer){ clearInterval(statsTimer); statsTimer = null; }
+  if (rafId != null){ cancelAnimationFrame(rafId); rafId = null; }
+  lastCT = null; lastWall = null;
+}
 
 function fmt(sec){
   sec = Math.floor(sec);
