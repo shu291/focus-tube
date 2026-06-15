@@ -2,7 +2,7 @@
    - アプリ本体(HTML/アイコン等)をキャッシュして、ネットがなくても起動できるようにする
    - Web Share Target で送られた動画ファイルを受け取り、オフラインライブラリに渡す
 */
-const CACHE = 'focustube-v1';
+const CACHE = 'focustube-v2';
 const SHELL = [
   './',
   './index.html',
@@ -10,6 +10,9 @@ const SHELL = [
   './background-player.html',
   './manifest.webmanifest',
   './icon.svg',
+  './apple-touch-icon.png',
+  './icon-192.png',
+  './icon-512.png',
 ];
 
 self.addEventListener('install', e => {

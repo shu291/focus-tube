@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#0d1117">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="icon.svg">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <title>FocusTube · オフライン</title>
 <style>
 :root{
@@ -43,6 +43,21 @@ header a{color:var(--sub);font-size:13px;text-decoration:none;border:1px solid v
 
 #main{max-width:680px;margin:0 auto;padding:16px 14px 48px}
 
+#install{
+  display:flex;align-items:flex-start;gap:11px;
+  background:var(--accent-dim);border:1px solid var(--accent);border-radius:12px;
+  padding:13px 14px;margin-bottom:14px;
+}
+#install .ico{font-size:22px;line-height:1.2}
+#install .body{flex:1;min-width:0}
+#install .t{font-size:13.5px;font-weight:700;color:var(--text)}
+#install .s{font-size:12.5px;color:var(--sub);line-height:1.8;margin-top:4px}
+#install .s b{color:var(--accent)}
+#installBtn{
+  margin-top:10px;background:var(--accent);color:#06121c;border:none;border-radius:9px;
+  padding:9px 16px;font-size:13.5px;font-weight:700;cursor:pointer;
+}
+#installClose{background:none;border:none;color:var(--sub);font-size:16px;cursor:pointer;padding:2px 4px;line-height:1}
 #net{
   display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--sub);
   background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin-bottom:14px;
@@ -130,6 +145,16 @@ header a{color:var(--sub);font-size:13px;text-decoration:none;border:1px solid v
 <div id="playerWrap"><video id="player" controls playsinline></video></div>
 
 <div id="main">
+  <div id="install" hidden>
+    <span class="ico">📲</span>
+    <div class="body">
+      <div class="t">単体アプリとして使う</div>
+      <div class="s" id="installText"></div>
+      <button id="installBtn" hidden>ホーム画面に追加</button>
+    </div>
+    <button id="installClose" aria-label="閉じる">✕</button>
+  </div>
+
   <div id="net"><span id="netDot"></span><span id="netText">接続状態を確認中…</span></div>
 
   <div id="drop">
@@ -152,7 +177,8 @@ header a{color:var(--sub);font-size:13px;text-decoration:none;border:1px solid v
 
   <div id="note">
     <div class="card">
-      <span class="tag">使い方</span>YouTubeアプリやPCで動画を保存しておけば、ネットがない場所でもここから再生できます。動画ファイルを<b>「共有」→ FocusTube</b> に送るか、上のエリアから追加してください。<br><br>
+      <span class="tag">使い方</span>YouTubeアプリやPCで動画を保存しておけば、ネットがない場所でもここから再生できます。<b>iPhoneでは</b>上のエリアをタップして「ファイル」や「写真」から動画を選んでください(Androidでは他アプリの<b>「共有」→ FocusTube</b> でも追加できます)。<br><br>
+      <span class="tag">iPhone</span>このページを <b>Safari</b> で開き、<b>共有ボタン → 「ホーム画面に追加」</b>で、単体アプリとして起動できます。追加後はネットがなくてもアプリから保存済みの動画を再生できます。<br><br>
       <span class="tag">注意</span>ブラウザのアプリは仕様上、YouTubeの動画データを直接ダウンロードできません(著作権・規約・技術的制約のため)。<b>手元にある動画ファイルを保存して</b>オフラインで見る仕組みです。公式の保存機能が必要な場合は <b>YouTube Premium</b> をご利用ください。
     </div>
   </div>
@@ -356,6 +382,44 @@ function updateNet(){
 window.addEventListener('online', updateNet);
 window.addEventListener('offline', updateNet);
 
+/* ---------- ホーム画面に追加(単体アプリ化)の案内 ---------- */
+const DISMISS_KEY = 'focusTube.installDismissed';
+let deferredPrompt = null;
+
+function isStandalone(){
+  return window.navigator.standalone === true ||
+    (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+}
+function isIOS(){
+  const ua = navigator.userAgent || '';
+  return /iphone|ipad|ipod/i.test(ua) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // iPadOS
+}
+function showInstall(){
+  if (isStandalone() || localStorage.getItem(DISMISS_KEY)) return;
+  const box = $('install'), txt = $('installText'), btn = $('installBtn');
+  if (deferredPrompt){
+    txt.innerHTML = 'インストールすると、ブラウザを開かずアプリとして起動できます。';
+    btn.hidden = false;
+  } else if (isIOS()){
+    txt.innerHTML = '下の<b>共有ボタン</b>(□に↑)を押して、<b>「ホーム画面に追加」</b>を選ぶと、単体アプリになります。';
+    btn.hidden = true;
+  } else {
+    return; // 案内する手段がない環境では出さない
+  }
+  box.hidden = false;
+}
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredPrompt = e; showInstall(); });
+window.addEventListener('appinstalled', () => { $('install').hidden = true; });
+$('installBtn').onclick = async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  try{ await deferredPrompt.userChoice; }catch(e){}
+  deferredPrompt = null;
+  $('install').hidden = true;
+};
+$('installClose').onclick = () => { $('install').hidden = true; localStorage.setItem(DISMISS_KEY, '1'); };
+
 /* ---------- wiring ---------- */
 $('drop').onclick = () => $('fileInput').click();
 $('fileInput').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
@@ -401,6 +465,7 @@ async function loadSharedFiles(){
   // できれば永続化(端末側で勝手に消されにくくする)
   try{ if (navigator.storage && navigator.storage.persist) await navigator.storage.persist(); }catch(e){}
   updateNet();
+  showInstall();
   try{ db = await openDB(); }catch(e){ toast('保存領域を開けませんでした'); return; }
   await refresh();
   await loadSharedFiles();
