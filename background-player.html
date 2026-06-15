@@ -112,7 +112,10 @@ header a{color:var(--sub);font-size:13px;text-decoration:none;border:1px solid v
 
 <header>
   <h1>Focus<span>Tube</span></h1>
-  <a href="index.html">プレイリスト版</a>
+  <div style="display:flex;gap:8px;align-items:center">
+    <a href="offline.html">オフライン</a>
+    <a href="index.html">プレイリスト版</a>
+  </div>
 </header>
 
 <div id="playerWrap">
@@ -483,6 +486,8 @@ document.querySelectorAll('#chartTabs .tab').forEach(t => {
 renderStats();
 setupMediaHandlers();
 if (document.visibilityState !== 'hidden') startStatsLoop(); // 起動時から計測ループを回す
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
 </body>
 </html>

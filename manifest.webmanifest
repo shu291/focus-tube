@@ -1,7 +1,7 @@
 {
   "name": "FocusTube",
   "short_name": "FocusTube",
-  "description": "選んだYouTube動画を1本だけバックグラウンド再生",
+  "description": "勉強用のYouTubeプレイヤー。保存した動画はオフラインでも再生できます。",
   "start_url": "./background-player.html",
   "scope": "./",
   "display": "standalone",
@@ -10,5 +10,20 @@
   "theme_color": "#0d1117",
   "icons": [
     { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
-  ]
+  ],
+  "shortcuts": [
+    { "name": "オフライン視聴", "short_name": "オフライン", "url": "./offline.html" },
+    { "name": "プレイリスト", "short_name": "リスト", "url": "./index.html" },
+    { "name": "1本だけ再生", "short_name": "1本", "url": "./background-player.html" }
+  ],
+  "share_target": {
+    "action": "./offline.html",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "files": [
+        { "name": "media", "accept": ["video/*", "audio/*"] }
+      ]
+    }
+  }
 }

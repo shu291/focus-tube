@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FocusTube">
+<meta name="theme-color" content="#0d1117">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>FocusTube · オフライン</title>
+<style>
+:root{
+  --bg:#0d1117; --panel:#161b22; --panel2:#1c2330; --line:#2a3344;
+  --text:#e6edf3; --sub:#8b97a8; --accent:#3fb6ff; --accent-dim:rgba(63,182,255,.14);
+  --ok:#3fb950; --warn:#d29922; --err:#ff7b72;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;
+  min-height:100vh; padding-bottom:env(safe-area-inset-bottom);
+}
+header{
+  position:sticky;top:0;z-index:10;
+  background:rgba(13,17,23,.92); backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--line);
+  padding:calc(12px + env(safe-area-inset-top)) 16px 12px;
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+}
+header h1{font-size:17px;font-weight:700;letter-spacing:.02em}
+header h1 span{color:var(--accent)}
+header a{color:var(--sub);font-size:13px;text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+
+#playerWrap{
+  position:sticky; top:calc(49px + env(safe-area-inset-top)); z-index:9;
+  background:#000; aspect-ratio:16/9; display:none;
+  max-width:680px; margin:0 auto;
+}
+#playerWrap video{width:100%;height:100%;display:block;background:#000}
+
+#main{max-width:680px;margin:0 auto;padding:16px 14px 48px}
+
+#net{
+  display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--sub);
+  background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin-bottom:14px;
+}
+#netDot{width:9px;min-width:9px;height:9px;border-radius:50%;background:var(--sub)}
+#netDot.off{background:var(--warn);box-shadow:0 0 8px var(--warn)}
+#netDot.on{background:var(--ok)}
+
+#drop{
+  border:1.5px dashed var(--line); border-radius:14px;
+  padding:22px 16px; text-align:center; cursor:pointer;
+  transition:border-color .15s, background .15s; margin-bottom:8px;
+}
+#drop.over{border-color:var(--accent); background:var(--accent-dim)}
+#drop .big{font-size:30px;line-height:1}
+#drop .t{font-size:14.5px;font-weight:700;margin-top:10px}
+#drop .s{font-size:12.5px;color:var(--sub);line-height:1.7;margin-top:6px}
+#fileInput{display:none}
+
+#storage{font-size:12px;color:var(--sub);text-align:right;margin:6px 2px 18px}
+#storage b{color:var(--text);font-variant-numeric:tabular-nums}
+
+#listHead{display:flex;align-items:baseline;justify-content:space-between;padding:2px 4px 12px}
+#listHead .label{font-size:13px;font-weight:600;color:var(--sub);letter-spacing:.04em}
+#listHead .count{font-size:12px;color:var(--sub)}
+
+.item{
+  display:flex;gap:12px;align-items:center;
+  background:var(--panel);border:1px solid var(--line);
+  border-radius:12px;padding:10px;margin-bottom:10px;
+  transition:background .15s,border-color .15s;
+}
+.item.playing{border-color:var(--accent);background:var(--accent-dim)}
+.item .thumb{
+  width:118px;min-width:118px;aspect-ratio:16/9;border-radius:8px;object-fit:cover;
+  background:#000 center/cover no-repeat; cursor:pointer; position:relative;
+  display:flex;align-items:center;justify-content:center;color:var(--sub);font-size:24px;
+}
+.item .dur{
+  position:absolute;right:5px;bottom:5px;background:rgba(0,0,0,.78);color:#fff;
+  font-size:10.5px;font-weight:600;padding:1px 5px;border-radius:4px;font-variant-numeric:tabular-nums;
+}
+.item .meta{flex:1;min-width:0;cursor:pointer}
+.item .title{
+  font-size:13.5px;font-weight:600;line-height:1.45;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.item .sub{font-size:11px;color:var(--sub);margin-top:5px}
+.item.playing .sub{color:var(--accent)}
+.item .del{
+  background:none;border:none;color:var(--sub);font-size:18px;cursor:pointer;
+  padding:6px 8px;align-self:flex-start;border-radius:8px;
+}
+.item .del:active{background:var(--panel2)}
+
+#empty{text-align:center;color:var(--sub);font-size:13.5px;line-height:1.9;padding:34px 14px}
+#empty .big{font-size:34px}
+
+#note{margin-top:22px}
+#note .card{
+  background:var(--panel);border:1px solid var(--line);border-radius:12px;
+  padding:14px;font-size:12.5px;color:var(--sub);line-height:1.9;
+}
+#note .card b{color:var(--text)}
+#note .card code{background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:12px;color:var(--text)}
+#note .card .tag{display:inline-block;background:var(--accent-dim);color:var(--accent);
+  border-radius:6px;padding:1px 7px;font-size:11px;font-weight:700;margin-right:6px}
+
+#toast{
+  position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);
+  background:var(--panel2);border:1px solid var(--line);color:var(--text);
+  font-size:13px;padding:11px 16px;border-radius:10px;z-index:30;
+  opacity:0;pointer-events:none;transition:opacity .2s;max-width:90%;text-align:center;
+}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Focus<span>Tube</span></h1>
+  <a href="index.html">オンライン版</a>
+</header>
+
+<div id="playerWrap"><video id="player" controls playsinline></video></div>
+
+<div id="main">
+  <div id="net"><span id="netDot"></span><span id="netText">接続状態を確認中…</span></div>
+
+  <div id="drop">
+    <div class="big">⬇️</div>
+    <div class="t">動画ファイルを保存してオフライン視聴</div>
+    <div class="s">タップして動画を選ぶ／ここにドラッグ&ドロップ<br>端末内に保存され、ネットがなくても再生できます</div>
+  </div>
+  <input id="fileInput" type="file" accept="video/*,audio/*" multiple>
+  <div id="storage"></div>
+
+  <div id="listHead">
+    <span class="label">保存した動画</span>
+    <span class="count" id="count"></span>
+  </div>
+  <div id="list"></div>
+  <div id="empty">
+    <div class="big">📭</div>
+    まだ保存した動画はありません。<br>上のエリアから動画ファイルを追加してね。
+  </div>
+
+  <div id="note">
+    <div class="card">
+      <span class="tag">使い方</span>YouTubeアプリやPCで動画を保存しておけば、ネットがない場所でもここから再生できます。動画ファイルを<b>「共有」→ FocusTube</b> に送るか、上のエリアから追加してください。<br><br>
+      <span class="tag">注意</span>ブラウザのアプリは仕様上、YouTubeの動画データを直接ダウンロードできません(著作権・規約・技術的制約のため)。<b>手元にある動画ファイルを保存して</b>オフラインで見る仕組みです。公式の保存機能が必要な場合は <b>YouTube Premium</b> をご利用ください。
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const DB_NAME = 'focusTube.offline', STORE = 'videos';
+let db = null, videos = [], currentId = null, curUrl = null;
+
+/* ---------- IndexedDB ---------- */
+function openDB(){
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = () => {
+      const d = req.result;
+      if (!d.objectStoreNames.contains(STORE)) d.createObjectStore(STORE, { keyPath:'id', autoIncrement:true });
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+function tx(mode){ return db.transaction(STORE, mode).objectStore(STORE); }
+function dbAll(){
+  return new Promise((res, rej) => { const r = tx('readonly').getAll(); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+}
+function dbPut(rec){
+  return new Promise((res, rej) => { const r = tx('readwrite').put(rec); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+}
+function dbDel(id){
+  return new Promise((res, rej) => { const r = tx('readwrite').delete(id); r.onsuccess = () => res(); r.onerror = () => rej(r.error); });
+}
+
+/* ---------- helpers ---------- */
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtSize(b){
+  if (b >= 1073741824) return (b/1073741824).toFixed(1) + ' GB';
+  if (b >= 1048576) return (b/1048576).toFixed(1) + ' MB';
+  if (b >= 1024) return (b/1024).toFixed(0) + ' KB';
+  return b + ' B';
+}
+function fmtDur(s){
+  if (!s || !isFinite(s)) return '';
+  s = Math.round(s);
+  const h = Math.floor(s/3600), m = Math.floor(s%3600/60), sec = s%60;
+  const mm = String(m).padStart(h>0?2:1,'0'), ss = String(sec).padStart(2,'0');
+  return (h>0 ? h+':' : '') + mm + ':' + ss;
+}
+let toastTimer = null;
+function toast(msg){
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+// 動画の長さとサムネイル(1フレーム)を取り出す。失敗してもファイルは保存する。
+function probe(file){
+  return new Promise(resolve => {
+    const url = URL.createObjectURL(file);
+    const v = document.createElement('video');
+    v.muted = true; v.playsInline = true; v.preload = 'metadata'; v.src = url;
+    let done = false;
+    const finish = (duration, thumb) => { if (done) return; done = true; URL.revokeObjectURL(url); resolve({ duration, thumb }); };
+    const fail = () => finish(0, null);
+    v.onerror = fail;
+    setTimeout(fail, 8000); // セーフティ
+    v.onloadedmetadata = () => {
+      const dur = v.duration;
+      if (!file.type.startsWith('video') || !isFinite(dur) || dur <= 0){ finish(isFinite(dur)?dur:0, null); return; }
+      const seekTo = Math.min(1, dur / 2);
+      v.onseeked = () => {
+        try{
+          const w = 320, h = Math.max(1, Math.round(w * (v.videoHeight/v.videoWidth || 9/16)));
+          const c = document.createElement('canvas'); c.width = w; c.height = h;
+          c.getContext('2d').drawImage(v, 0, 0, w, h);
+          finish(dur, c.toDataURL('image/jpeg', 0.6));
+        }catch(e){ finish(dur, null); }
+      };
+      try{ v.currentTime = seekTo; }catch(e){ finish(dur, null); }
+    };
+  });
+}
+
+/* ---------- import ---------- */
+async function addFiles(fileList){
+  const files = [...fileList].filter(f => f.type.startsWith('video') || f.type.startsWith('audio'));
+  if (!files.length){ toast('動画・音声ファイルを選んでね'); return; }
+  toast(files.length > 1 ? files.length + '本を保存中…' : '保存中…');
+  for (const file of files){
+    try{
+      const { duration, thumb } = await probe(file);
+      await dbPut({ name:file.name, type:file.type, size:file.size, blob:file, duration, thumb, addedAt:Date.now() });
+    }catch(e){
+      console.error(e); toast('保存に失敗: ' + file.name);
+    }
+  }
+  await refresh();
+  toast('オフラインに保存しました');
+}
+
+/* ---------- render ---------- */
+async function refresh(){
+  videos = (await dbAll()).sort((a,b) => b.addedAt - a.addedAt);
+  $('count').textContent = videos.length ? videos.length + '本' : '';
+  $('empty').style.display = videos.length ? 'none' : 'block';
+  const list = $('list');
+  list.innerHTML = '';
+  for (const v of videos){
+    const el = document.createElement('div');
+    el.className = 'item' + (v.id === currentId ? ' playing' : '');
+    el.dataset.id = v.id;
+    const thumbStyle = v.thumb ? ('style="background-image:url(' + v.thumb + ')"') : '';
+    el.innerHTML =
+      '<div class="thumb" ' + thumbStyle + '>' + (v.thumb ? '' : (v.type.startsWith('audio') ? '🎵' : '🎬')) +
+        (v.duration ? '<span class="dur">' + fmtDur(v.duration) + '</span>' : '') + '</div>' +
+      '<div class="meta">' +
+        '<div class="title">' + escapeHtml(v.name) + '</div>' +
+        '<div class="sub">' + (v.id === currentId ? '▶ 再生中' : fmtSize(v.size)) + '</div>' +
+      '</div>' +
+      '<button class="del" title="削除">🗑</button>';
+    el.querySelector('.thumb').onclick = () => play(v.id);
+    el.querySelector('.meta').onclick = () => play(v.id);
+    el.querySelector('.del').onclick = e => { e.stopPropagation(); remove(v.id); };
+    list.appendChild(el);
+  }
+  updateStorage();
+}
+
+async function updateStorage(){
+  const total = videos.reduce((a, v) => a + (v.size||0), 0);
+  let extra = '';
+  try{
+    if (navigator.storage && navigator.storage.estimate){
+      const { usage, quota } = await navigator.storage.estimate();
+      if (quota) extra = ' / 端末の空き目安 ' + fmtSize(Math.max(0, quota - usage));
+    }
+  }catch(e){}
+  $('storage').innerHTML = videos.length ? '使用容量 <b>' + fmtSize(total) + '</b>' + extra : '';
+}
+
+/* ---------- playback ---------- */
+function play(id){
+  const v = videos.find(x => x.id === id);
+  if (!v) return;
+  if (curUrl){ URL.revokeObjectURL(curUrl); curUrl = null; }
+  curUrl = URL.createObjectURL(v.blob);
+  const p = $('player');
+  $('playerWrap').style.display = 'block';
+  p.src = curUrl;
+  currentId = id;
+  p.play().catch(()=>{});
+  setMediaSession(v);
+  refresh();
+  window.scrollTo({ top:0, behavior:'smooth' });
+}
+
+async function remove(id){
+  const v = videos.find(x => x.id === id);
+  if (!confirm('「' + (v ? v.name : 'この動画') + '」を削除しますか?')) return;
+  if (id === currentId){
+    const p = $('player'); p.pause(); p.removeAttribute('src'); p.load();
+    $('playerWrap').style.display = 'none';
+    if (curUrl){ URL.revokeObjectURL(curUrl); curUrl = null; }
+    currentId = null;
+  }
+  await dbDel(id);
+  await refresh();
+  toast('削除しました');
+}
+
+// 終わったら次の動画へ
+$('player').addEventListener('ended', () => {
+  const i = videos.findIndex(v => v.id === currentId);
+  if (i > -1 && i < videos.length - 1) play(videos[i + 1].id);
+});
+
+function setMediaSession(v){
+  if (!('mediaSession' in navigator)) return;
+  try{
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: v.name, artist: 'FocusTube · オフライン',
+      artwork: v.thumb ? [{ src:v.thumb, sizes:'320x180', type:'image/jpeg' }] : []
+    });
+    const p = $('player');
+    navigator.mediaSession.setActionHandler('play', () => p.play());
+    navigator.mediaSession.setActionHandler('pause', () => p.pause());
+    navigator.mediaSession.setActionHandler('seekbackward', d => { p.currentTime = Math.max(0, p.currentTime - (d.seekOffset||10)); });
+    navigator.mediaSession.setActionHandler('seekforward', d => { p.currentTime = Math.min(p.duration||1e9, p.currentTime + (d.seekOffset||10)); });
+    navigator.mediaSession.setActionHandler('previoustrack', () => { const i = videos.findIndex(x=>x.id===currentId); if (i>0) play(videos[i-1].id); });
+    navigator.mediaSession.setActionHandler('nexttrack', () => { const i = videos.findIndex(x=>x.id===currentId); if (i>-1 && i<videos.length-1) play(videos[i+1].id); });
+  }catch(e){}
+}
+
+/* ---------- network status ---------- */
+function updateNet(){
+  const on = navigator.onLine;
+  $('netDot').className = on ? 'on' : 'off';
+  $('netText').textContent = on ? 'オンライン — 保存した動画はネットがなくても再生できます' : 'オフライン — 保存済みの動画はそのまま再生できます';
+}
+window.addEventListener('online', updateNet);
+window.addEventListener('offline', updateNet);
+
+/* ---------- wiring ---------- */
+$('drop').onclick = () => $('fileInput').click();
+$('fileInput').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
+['dragenter','dragover'].forEach(ev => $('drop').addEventListener(ev, e => { e.preventDefault(); $('drop').classList.add('over'); }));
+['dragleave','drop'].forEach(ev => $('drop').addEventListener(ev, e => { e.preventDefault(); $('drop').classList.remove('over'); }));
+$('drop').addEventListener('drop', e => { if (e.dataTransfer && e.dataTransfer.files.length) addFiles(e.dataTransfer.files); });
+// ページ全体へのドロップも受け付ける
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => e.preventDefault());
+
+// 共有(Web Share Target)で送られたファイルを取り込む。
+// Service Worker が共有ファイルを 'focusTube.share' に置くので、ここで取り出す。
+function takeSharedFiles(){
+  return new Promise(resolve => {
+    let req;
+    try{ req = indexedDB.open('focusTube.share', 1); }catch(e){ return resolve([]); }
+    req.onupgradeneeded = () => { const d = req.result; if (!d.objectStoreNames.contains('pending')) d.createObjectStore('pending', { keyPath:'id', autoIncrement:true }); };
+    req.onerror = () => resolve([]);
+    req.onsuccess = () => {
+      const d = req.result;
+      const st = d.transaction('pending', 'readwrite').objectStore('pending');
+      const all = st.getAll();
+      all.onsuccess = () => {
+        const files = [];
+        (all.result || []).forEach(r => (r.files || []).forEach(f => files.push(f)));
+        st.clear();
+        resolve(files);
+      };
+      all.onerror = () => resolve([]);
+    };
+  });
+}
+async function loadSharedFiles(){
+  if (!/[?&]shared=1/.test(location.search)) return;
+  try{
+    const files = await takeSharedFiles();
+    if (files.length) await addFiles(files);
+  }catch(e){ console.error(e); }
+  history.replaceState(null, '', location.pathname);
+}
+
+(async function init(){
+  // できれば永続化(端末側で勝手に消されにくくする)
+  try{ if (navigator.storage && navigator.storage.persist) await navigator.storage.persist(); }catch(e){}
+  updateNet();
+  try{ db = await openDB(); }catch(e){ toast('保存領域を開けませんでした'); return; }
+  await refresh();
+  await loadSharedFiles();
+})();
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>

@@ -92,6 +92,7 @@ header h1 span{color:var(--accent)}
 <header>
   <h1>Focus<span>Tube</span></h1>
   <div style="display:flex;gap:8px;align-items:center">
+    <a href="offline.html" style="color:var(--sub);font-size:13px;text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:6px 10px">オフライン</a>
     <a href="background-player.html" style="color:var(--sub);font-size:13px;text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:6px 10px">1本だけ再生</a>
     <button id="settingsBtn">リスト変更</button>
   </div>
@@ -299,6 +300,8 @@ $('settingsBtn').onclick = () => {
 
 const saved = localStorage.getItem(LS_KEY);
 if (saved) loadPlaylist(saved);
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
 </body>
 </html>
