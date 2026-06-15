@@ -39,7 +39,8 @@ header a{color:var(--sub);font-size:13px;text-decoration:none;border:1px solid v
   background:#000; aspect-ratio:16/9; display:none;
   max-width:680px; margin:0 auto;
 }
-#playerWrap video{width:100%;height:100%;display:block;background:#000}
+#playerWrap video,#playerWrap iframe{width:100%;height:100%;display:block;background:#000;border:0}
+#playerWrap iframe{display:none}
 
 #main{max-width:680px;margin:0 auto;padding:16px 14px 48px}
 
@@ -66,6 +67,25 @@ header a{color:var(--sub);font-size:13px;text-decoration:none;border:1px solid v
 #netDot.off{background:var(--warn);box-shadow:0 0 8px var(--warn)}
 #netDot.on{background:var(--ok)}
 
+#ytAdd{margin-bottom:14px}
+#ytAdd .row{display:flex;gap:8px}
+#ytInput{
+  flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);
+  color:var(--text);border-radius:10px;padding:12px 13px;font-size:15px;outline:none;
+}
+#ytInput:focus{border-color:var(--accent)}
+#ytPaste{
+  background:var(--panel2);border:1px solid var(--line);color:var(--text);
+  border-radius:10px;padding:0 13px;font-size:16px;cursor:pointer;
+}
+#ytBtn{
+  background:var(--accent);color:#06121c;border:none;border-radius:10px;
+  padding:0 18px;font-size:14.5px;font-weight:700;cursor:pointer;white-space:nowrap;
+}
+#ytAdd .hint{font-size:11.5px;color:var(--sub);line-height:1.7;margin:8px 2px 0}
+#ytAdd .hint b{color:var(--text)}
+#orline{display:flex;align-items:center;gap:10px;color:var(--sub);font-size:11.5px;margin:0 2px 12px}
+#orline::before,#orline::after{content:"";flex:1;height:1px;background:var(--line)}
 #drop{
   border:1.5px dashed var(--line); border-radius:14px;
   padding:22px 16px; text-align:center; cursor:pointer;
@@ -99,6 +119,10 @@ header a{color:var(--sub);font-size:13px;text-decoration:none;border:1px solid v
 .item .dur{
   position:absolute;right:5px;bottom:5px;background:rgba(0,0,0,.78);color:#fff;
   font-size:10.5px;font-weight:600;padding:1px 5px;border-radius:4px;font-variant-numeric:tabular-nums;
+}
+.item .badge{
+  position:absolute;left:5px;top:5px;background:#ff3b30;color:#fff;
+  font-size:9px;font-weight:700;letter-spacing:.02em;padding:1px 5px;border-radius:4px;
 }
 .item .meta{flex:1;min-width:0;cursor:pointer}
 .item .title{
@@ -142,7 +166,10 @@ header a{color:var(--sub);font-size:13px;text-decoration:none;border:1px solid v
   <a href="index.html">オンライン版</a>
 </header>
 
-<div id="playerWrap"><video id="player" controls playsinline></video></div>
+<div id="playerWrap">
+  <video id="player" controls playsinline></video>
+  <iframe id="ytframe" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>
+</div>
 
 <div id="main">
   <div id="install" hidden>
@@ -156,6 +183,18 @@ header a{color:var(--sub);font-size:13px;text-decoration:none;border:1px solid v
   </div>
 
   <div id="net"><span id="netDot"></span><span id="netText">接続状態を確認中…</span></div>
+
+  <div id="ytAdd">
+    <div class="row">
+      <input id="ytInput" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false"
+        placeholder="YouTubeのリンクを貼り付け（youtu.be/… など）">
+      <button id="ytPaste" title="貼り付け">📋</button>
+      <button id="ytBtn">追加</button>
+    </div>
+    <div class="hint">リンクで追加した動画は<b>ネット接続時のみ</b>再生できます（オフライン保存ではありません）。</div>
+  </div>
+
+  <div id="orline"><span>または、動画ファイルを保存して完全オフライン</span></div>
 
   <div id="drop">
     <div class="big">⬇️</div>
@@ -172,14 +211,15 @@ header a{color:var(--sub);font-size:13px;text-decoration:none;border:1px solid v
   <div id="list"></div>
   <div id="empty">
     <div class="big">📭</div>
-    まだ保存した動画はありません。<br>上のエリアから動画ファイルを追加してね。
+    まだ動画がありません。<br>YouTubeのリンクを貼るか、動画ファイルを追加してね。
   </div>
 
   <div id="note">
     <div class="card">
-      <span class="tag">使い方</span>YouTubeアプリやPCで動画を保存しておけば、ネットがない場所でもここから再生できます。<b>iPhoneでは</b>上のエリアをタップして「ファイル」や「写真」から動画を選んでください(Androidでは他アプリの<b>「共有」→ FocusTube</b> でも追加できます)。<br><br>
-      <span class="tag">iPhone</span>このページを <b>Safari</b> で開き、<b>共有ボタン → 「ホーム画面に追加」</b>で、単体アプリとして起動できます。追加後はネットがなくてもアプリから保存済みの動画を再生できます。<br><br>
-      <span class="tag">注意</span>ブラウザのアプリは仕様上、YouTubeの動画データを直接ダウンロードできません(著作権・規約・技術的制約のため)。<b>手元にある動画ファイルを保存して</b>オフラインで見る仕組みです。公式の保存機能が必要な場合は <b>YouTube Premium</b> をご利用ください。
+      <span class="tag">リンクで追加</span>YouTubeのリンクを貼ると、このアプリ内でまとめて再生できます。ただし<b>再生にはネット接続が必要</b>で、オフライン保存ではありません(YouTubeの埋め込み再生です)。<br><br>
+      <span class="tag">完全オフライン</span>YouTubeアプリやPCで保存した動画ファイルを「ファイル」「写真」から追加すると、<b>ネットがない場所でも</b>再生できます(Androidでは他アプリの<b>「共有」→ FocusTube</b> でも追加可)。<br><br>
+      <span class="tag">iPhone</span>このページを <b>Safari</b> で開き、<b>共有ボタン → 「ホーム画面に追加」</b>で、単体アプリとして起動できます。<br><br>
+      <span class="tag">注意</span>ブラウザのアプリは仕様上、YouTubeの動画データ自体を直接ダウンロードして保存することはできません(著作権・規約・技術的制約のため)。動画を端末に持っておきたい場合は、公式の <b>YouTube Premium</b> のオフライン機能をご利用ください。
     </div>
   </div>
 </div>
@@ -280,6 +320,32 @@ async function addFiles(fileList){
   toast('オフラインに保存しました');
 }
 
+/* ---------- YouTubeリンクから追加(オンライン再生) ---------- */
+function ytId(input){
+  input = (input || '').trim();
+  if (!input) return null;
+  if (/^[A-Za-z0-9_-]{11}$/.test(input)) return input;
+  const m = input.match(/(?:youtu\.be\/|\/embed\/|\/shorts\/|\/live\/|[?&]v=)([A-Za-z0-9_-]{11})/);
+  return m ? m[1] : null;
+}
+async function addYouTube(raw){
+  const id = ytId(raw);
+  if (!id){ toast('YouTubeのリンクを読み取れませんでした'); return false; }
+  if (videos.some(v => v.kind === 'youtube' && v.videoId === id)){ toast('すでに追加済みです'); return true; }
+  let title = 'YouTube動画';
+  if (navigator.onLine){
+    try{
+      const r = await fetch('https://noembed.com/embed?url=https://www.youtube.com/watch?v=' + id);
+      const j = await r.json();
+      if (j && j.title) title = j.title;
+    }catch(e){}
+  }
+  await dbPut({ kind:'youtube', videoId:id, name:title, thumb:'https://i.ytimg.com/vi/' + id + '/mqdefault.jpg', duration:0, addedAt:Date.now() });
+  await refresh();
+  toast('リンクを追加しました');
+  return true;
+}
+
 /* ---------- render ---------- */
 async function refresh(){
   videos = (await dbAll()).sort((a,b) => b.addedAt - a.addedAt);
@@ -291,13 +357,17 @@ async function refresh(){
     const el = document.createElement('div');
     el.className = 'item' + (v.id === currentId ? ' playing' : '');
     el.dataset.id = v.id;
+    const isYt = v.kind === 'youtube';
     const thumbStyle = v.thumb ? ('style="background-image:url(' + v.thumb + ')"') : '';
+    const fallback = v.thumb ? '' : (isYt ? '▶' : (v.type||'').startsWith('audio') ? '🎵' : '🎬');
+    const sub = v.id === currentId ? '▶ 再生中' : (isYt ? 'YouTube · 要ネット' : fmtSize(v.size));
     el.innerHTML =
-      '<div class="thumb" ' + thumbStyle + '>' + (v.thumb ? '' : (v.type.startsWith('audio') ? '🎵' : '🎬')) +
+      '<div class="thumb" ' + thumbStyle + '>' + fallback +
+        (isYt ? '<span class="badge">YouTube</span>' : '') +
         (v.duration ? '<span class="dur">' + fmtDur(v.duration) + '</span>' : '') + '</div>' +
       '<div class="meta">' +
         '<div class="title">' + escapeHtml(v.name) + '</div>' +
-        '<div class="sub">' + (v.id === currentId ? '▶ 再生中' : fmtSize(v.size)) + '</div>' +
+        '<div class="sub">' + sub + '</div>' +
       '</div>' +
       '<button class="del" title="削除">🗑</button>';
     el.querySelector('.thumb').onclick = () => play(v.id);
@@ -321,17 +391,34 @@ async function updateStorage(){
 }
 
 /* ---------- playback ---------- */
+function stopFile(){
+  const p = $('player'); p.pause(); p.removeAttribute('src'); p.load(); p.style.display = 'none';
+  if (curUrl){ URL.revokeObjectURL(curUrl); curUrl = null; }
+}
+function stopYt(){ const f = $('ytframe'); f.src = 'about:blank'; f.style.display = 'none'; }
+
 function play(id){
   const v = videos.find(x => x.id === id);
   if (!v) return;
-  if (curUrl){ URL.revokeObjectURL(curUrl); curUrl = null; }
-  curUrl = URL.createObjectURL(v.blob);
-  const p = $('player');
-  $('playerWrap').style.display = 'block';
-  p.src = curUrl;
   currentId = id;
-  p.play().catch(()=>{});
-  setMediaSession(v);
+  $('playerWrap').style.display = 'block';
+  if (v.kind === 'youtube'){
+    stopFile();
+    if (!navigator.onLine) toast('YouTube動画の再生にはネット接続が必要です');
+    const f = $('ytframe');
+    f.style.display = 'block';
+    f.src = 'https://www.youtube.com/embed/' + v.videoId + '?autoplay=1&playsinline=1&rel=0&modestbranding=1&iv_load_policy=3';
+    if ('mediaSession' in navigator){ try{ navigator.mediaSession.metadata = null; }catch(e){} }
+  } else {
+    stopYt();
+    if (curUrl){ URL.revokeObjectURL(curUrl); curUrl = null; }
+    curUrl = URL.createObjectURL(v.blob);
+    const p = $('player');
+    p.style.display = 'block';
+    p.src = curUrl;
+    p.play().catch(()=>{});
+    setMediaSession(v);
+  }
   refresh();
   window.scrollTo({ top:0, behavior:'smooth' });
 }
@@ -340,9 +427,8 @@ async function remove(id){
   const v = videos.find(x => x.id === id);
   if (!confirm('「' + (v ? v.name : 'この動画') + '」を削除しますか?')) return;
   if (id === currentId){
-    const p = $('player'); p.pause(); p.removeAttribute('src'); p.load();
+    stopFile(); stopYt();
     $('playerWrap').style.display = 'none';
-    if (curUrl){ URL.revokeObjectURL(curUrl); curUrl = null; }
     currentId = null;
   }
   await dbDel(id);
@@ -421,6 +507,19 @@ $('installBtn').onclick = async () => {
 $('installClose').onclick = () => { $('install').hidden = true; localStorage.setItem(DISMISS_KEY, '1'); };
 
 /* ---------- wiring ---------- */
+async function submitYt(){
+  const ok = await addYouTube($('ytInput').value);
+  if (ok) $('ytInput').value = '';
+}
+$('ytBtn').onclick = submitYt;
+$('ytInput').addEventListener('keydown', e => { if (e.key === 'Enter') submitYt(); });
+$('ytPaste').onclick = async () => {
+  try{
+    const text = await navigator.clipboard.readText();
+    if (text){ $('ytInput').value = text; submitYt(); }
+  }catch(e){ $('ytInput').focus(); toast('入力欄に長押しで貼り付けてね'); }
+};
+
 $('drop').onclick = () => $('fileInput').click();
 $('fileInput').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
 ['dragenter','dragover'].forEach(ev => $('drop').addEventListener(ev, e => { e.preventDefault(); $('drop').classList.add('over'); }));
