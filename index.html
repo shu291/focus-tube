@@ -10,11 +10,12 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
-<title>FocusTube</title>
+<title>FocusTube · 勉強タイマー</title>
 <style>
 :root{
   --bg:#0d1117; --panel:#161b22; --panel2:#1c2330; --line:#2a3344;
   --text:#e6edf3; --sub:#8b97a8; --accent:#3fb6ff; --accent-dim:rgba(63,182,255,.14);
+  --ok:#3fb950; --warn:#d29922; --err:#ff7b72;
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{
@@ -31,275 +32,668 @@ header{
 }
 header h1{font-size:17px;font-weight:700;letter-spacing:.02em}
 header h1 span{color:var(--accent)}
-#settingsBtn{
-  background:none;border:1px solid var(--line);color:var(--sub);
-  border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer;
-}
-#setup{padding:28px 20px;max-width:560px;margin:0 auto}
-#setup h2{font-size:15px;font-weight:600;margin-bottom:6px}
-#setup p{font-size:13px;color:var(--sub);line-height:1.8;margin-bottom:16px}
-#plInput{
-  width:100%;background:var(--panel);border:1px solid var(--line);
-  color:var(--text);border-radius:10px;padding:13px 14px;font-size:15px;
-  margin-bottom:12px;outline:none;
-}
-#plInput:focus{border-color:var(--accent)}
-#pasteBtn{
-  width:100%;background:var(--accent);color:#06121c;border:none;
-  border-radius:10px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;
-  margin-bottom:10px;
-}
-#saveBtn{
-  width:100%;background:var(--panel2);color:var(--sub);
-  border:1px solid var(--line);border-radius:10px;padding:13px;
-  font-size:14px;font-weight:600;cursor:pointer;
-}
-#setupErr{color:#ff7b72;font-size:13px;margin-top:10px;display:none;line-height:1.7}
-#hint{margin-top:22px;font-size:12.5px;color:var(--sub);line-height:1.9;
-  background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
-#hint b{color:var(--text)}
+header .badge{font-size:12px;color:var(--sub);border:1px solid var(--line);border-radius:8px;padding:5px 10px}
+
 #playerWrap{
   position:sticky; top:calc(49px + env(safe-area-inset-top)); z-index:9;
-  background:#000; aspect-ratio:16/9; display:none;
-  max-width:680px; margin:0 auto;
+  background:#000; aspect-ratio:16/9;
+  max-width:680px; margin:0 auto; overflow:hidden;
 }
 #playerWrap iframe{width:100%;height:100%;display:block}
-#listWrap{max-width:680px;margin:0 auto;padding:10px 12px 40px}
-#listHead{display:flex;align-items:baseline;justify-content:space-between;padding:8px 4px 10px;display:none}
-#listHead .count{font-size:12px;color:var(--sub)}
-#listHead .label{font-size:13px;font-weight:600;color:var(--sub);letter-spacing:.04em}
-.item{
-  display:flex;gap:12px;align-items:center;
-  background:var(--panel);border:1px solid var(--line);
-  border-radius:12px;padding:10px;margin-bottom:10px;
-  cursor:pointer;transition:background .15s,border-color .15s;
+#poster{
+  position:absolute; inset:0; z-index:2; cursor:pointer;
+  background-size:cover; background-position:center;
+  display:flex; align-items:center; justify-content:center;
 }
-.item:active{background:var(--panel2)}
-.item.playing{border-color:var(--accent);background:var(--accent-dim)}
-.thumb{width:118px;min-width:118px;aspect-ratio:16/9;border-radius:8px;object-fit:cover;background:#000}
-.meta{flex:1;min-width:0}
-.title{
-  font-size:13.5px;font-weight:600;line-height:1.45;
-  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+#poster::before{content:"";position:absolute;inset:0;background:rgba(0,0,0,.35)}
+#poster.hide{display:none}
+#playBtn{
+  position:relative; z-index:1;
+  width:74px; height:74px; border-radius:50%;
+  background:var(--accent); color:#06121c;
+  display:flex; align-items:center; justify-content:center;
+  font-size:30px; box-shadow:0 6px 24px rgba(0,0,0,.5);
 }
-.idx{font-size:11px;color:var(--sub);margin-top:5px}
-.item.playing .idx{color:var(--accent)}
-#status{padding:30px 16px;text-align:center;color:var(--sub);font-size:13.5px;line-height:1.8;display:none}
+#playBtn span{margin-left:5px}
+
+#info{max-width:680px;margin:0 auto;padding:16px 16px 0}
+#vTitle{font-size:16px;font-weight:700;line-height:1.5}
+
+/* ---- 勉強タイマー ---- */
+#timerCard{
+  margin-top:14px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+  padding:18px 16px;text-align:center;
+}
+#timerCard.done{border-color:var(--ok);box-shadow:0 0 0 1px var(--ok) inset}
+#timerLabel{font-size:12px;color:var(--sub);letter-spacing:.06em;margin-bottom:6px}
+#timerDisplay{
+  font-size:56px;font-weight:800;line-height:1;letter-spacing:.01em;
+  font-variant-numeric:tabular-nums;
+}
+#timerCard.running #timerDisplay{color:var(--accent)}
+#timerCard.done #timerDisplay{color:var(--ok)}
+#presets{display:flex;gap:8px;margin-top:14px}
+#presets .pre{
+  flex:1;background:var(--panel2);border:1px solid var(--line);color:var(--sub);
+  border-radius:9px;padding:9px 4px;font-size:13px;font-weight:600;cursor:pointer;
+}
+#presets .pre.on{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
+#customRow{display:flex;gap:8px;margin-top:8px;align-items:center}
+#customMin{
+  flex:1;background:var(--panel2);border:1px solid var(--line);color:var(--text);
+  border-radius:9px;padding:10px 12px;font-size:14px;outline:none;text-align:center;
+}
+#customMin:focus{border-color:var(--accent)}
+#customRow .unit{font-size:13px;color:var(--sub)}
+#timerBtns{display:flex;gap:8px;margin-top:12px}
+#timerBtns button{
+  flex:1;border-radius:10px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;
+  border:1px solid var(--line);
+}
+#startBtn{background:var(--accent);color:#06121c;border-color:var(--accent)}
+#startBtn.pause{background:var(--warn);border-color:var(--warn);color:#1a1300}
+#resetTimer{background:var(--panel2);color:var(--text);flex:0 0 auto;padding-left:18px;padding-right:18px}
+
+#bgState{
+  margin-top:14px;display:flex;align-items:center;gap:10px;
+  background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;
+}
+#bgDot{width:10px;min-width:10px;height:10px;border-radius:50%;background:var(--sub);transition:background .2s}
+#bgDot.on{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+#bgText{font-size:13px;color:var(--sub);line-height:1.6}
+#bgText b{color:var(--text)}
+
+#stats{margin-top:14px;display:flex;gap:10px}
+#stats .stat{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 10px;text-align:center}
+#stats .stat .k{font-size:11px;color:var(--sub);letter-spacing:.04em}
+#stats .stat .v{font-size:19px;font-weight:700;margin-top:5px;font-variant-numeric:tabular-nums}
+#stats .stat .v small{font-size:12px;color:var(--sub);font-weight:600;margin:0 1px}
+#stats .stat.total .v{color:var(--accent)}
+
+#chartCard{margin-top:12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+#chartTabs{display:flex;gap:6px;margin-bottom:14px}
+#chartTabs .tab{flex:1;background:var(--panel2);border:1px solid var(--line);color:var(--sub);border-radius:8px;padding:8px;font-size:13px;font-weight:600;cursor:pointer}
+#chartTabs .tab.on{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
+#chart{display:flex;align-items:flex-end;gap:6px;height:152px}
+#chart .col{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;min-width:0}
+#chart .bval{font-size:10px;color:var(--sub);margin-bottom:4px;height:12px;white-space:nowrap;font-variant-numeric:tabular-nums}
+#chart .barwrap{flex:1;width:100%;display:flex;align-items:flex-end;justify-content:center}
+#chart .bar{width:72%;max-width:34px;min-height:2px;background:linear-gradient(180deg,var(--accent),#2b7fb8);border-radius:5px 5px 0 0;transition:height .3s}
+#chart .col.zero .bar{background:var(--line)}
+#chart .blab{font-size:10.5px;color:var(--sub);margin-top:6px;white-space:nowrap}
+
+#resetWrap{text-align:right;margin-top:8px}
+#resetBtn{background:none;border:none;color:var(--sub);font-size:12px;cursor:pointer;text-decoration:underline;padding:2px 4px}
+
+.controls{max-width:680px;margin:16px auto 0;padding:0 16px;display:flex;gap:10px}
+.controls button{
+  flex:1;background:var(--panel2);color:var(--text);border:1px solid var(--line);
+  border-radius:10px;padding:13px;font-size:14px;font-weight:600;cursor:pointer;
+}
+.controls button:active{background:var(--panel)}
+#bgToggle.on{border-color:var(--ok);color:var(--ok)}
+#replay{flex:0 0 auto}
+
+#note{max-width:680px;margin:18px auto 40px;padding:0 16px}
+#note .card{
+  background:var(--panel);border:1px solid var(--line);border-radius:12px;
+  padding:14px;font-size:12.5px;color:var(--sub);line-height:1.9;
+}
+#note .card b{color:var(--text)}
+#note .card .tag{display:inline-block;background:var(--accent-dim);color:var(--accent);
+  border-radius:6px;padding:1px 7px;font-size:11px;font-weight:700;margin-right:6px}
+
+#toast{
+  position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);
+  background:var(--ok);color:#04210d;font-weight:700;font-size:14px;
+  padding:13px 20px;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.5);
+  z-index:50;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;white-space:nowrap;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 </style>
 </head>
 <body>
 
 <header>
   <h1>Focus<span>Tube</span></h1>
-  <div style="display:flex;gap:8px;align-items:center">
-    <a href="offline.html" style="color:var(--sub);font-size:13px;text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:6px 10px">オフライン</a>
-    <a href="background-player.html" style="color:var(--sub);font-size:13px;text-decoration:none;border:1px solid var(--line);border-radius:8px;padding:6px 10px">1本だけ再生</a>
-    <button id="settingsBtn">リスト変更</button>
-  </div>
+  <span class="badge">勉強モード</span>
 </header>
 
-<div id="setup">
-  <h2>勉強用の再生リストを登録</h2>
-  <p>YouTubeアプリで再生リストを開いて「共有 → コピー」してから、下のボタンをタップ。</p>
-  <button id="pasteBtn">📋 コピーしたURLで始める</button>
-  <input id="plInput" type="text" placeholder="または、ここにURLをペースト">
-  <button id="saveBtn">このリストで始める</button>
-  <div id="setupErr"></div>
-  <div id="hint">
-    💡 再生リストの公開設定は<b>「限定公開」か「公開」</b>にしてね。「非公開」だとYouTube側の制限で再生できない。
+<div id="playerWrap">
+  <div id="player"></div>
+  <div id="poster" style="background-image:url('https://i.ytimg.com/vi/vr9dLvJs7VE/hqdefault.jpg')">
+    <div id="playBtn"><span>▶</span></div>
   </div>
 </div>
 
-<div id="playerWrap"><div id="player"></div></div>
+<div id="info">
+  <div id="vTitle">読み込み中…</div>
 
-<div id="listWrap">
-  <div id="status"></div>
-  <div id="listHead">
-    <span class="label">勉強用プレイリスト</span>
-    <span class="count" id="count"></span>
+  <div id="timerCard">
+    <div id="timerLabel">集中タイマー</div>
+    <div id="timerDisplay">25:00</div>
+    <div id="presets">
+      <button class="pre on" data-min="25">25分</button>
+      <button class="pre" data-min="50">50分</button>
+      <button class="pre" data-min="90">90分</button>
+    </div>
+    <div id="customRow">
+      <input id="customMin" type="number" inputmode="numeric" min="1" max="600" placeholder="自由設定">
+      <span class="unit">分</span>
+    </div>
+    <div id="timerBtns">
+      <button id="startBtn">▶ スタート</button>
+      <button id="resetTimer">リセット</button>
+    </div>
   </div>
-  <div id="list"></div>
+
+  <div id="bgState">
+    <span id="bgDot"></span>
+    <span id="bgText">BG: <b>ON</b>。再生中は<b>画面を消さず</b>に流し続けます(自動ロックで止まるのを防止)。</span>
+  </div>
+  <div id="stats">
+    <div class="stat total"><div class="k">累計再生時間</div><div class="v" id="totalV">0<small>秒</small></div></div>
+    <div class="stat"><div class="k">今日</div><div class="v" id="todayV">0<small>秒</small></div></div>
+  </div>
+  <div id="chartCard">
+    <div id="chartTabs">
+      <button class="tab on" data-m="day">日</button>
+      <button class="tab" data-m="week">週</button>
+      <button class="tab" data-m="month">月</button>
+    </div>
+    <div id="chart"></div>
+  </div>
+  <div id="resetWrap"><button id="resetBtn">記録をリセット</button></div>
 </div>
+
+<div class="controls">
+  <button id="playPause">⏸ 一時停止</button>
+  <button id="bgToggle" class="on">🌙 BG: ON</button>
+  <button id="replay">↺ 頭から</button>
+</div>
+
+<div id="note">
+  <div class="card">
+    <span class="tag">使い方</span>勉強用BGMを流しながら<b>集中タイマー</b>で時間を区切れます。スタートを押すと動画が再生され、タイマーが0になると<b>音とバイブで通知</b>して再生を止めます。<br><br>
+    <span class="tag">BG</span>BG: ON の間は再生中に<b>画面の自動消灯を防止</b>(Wake Lock)。机に置いて数分で止まるのを防ぎます。電池を使うので不要なときは OFF に。<br><br>
+    <span class="tag">注意</span>WebのYouTubeは<b>画面を消す/他アプリに切り替えると再生が止まります</b>(完全な裏再生はOS・YouTube側の制限で不可)。戻れば自動で再開します。
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- 音声セッションを保持するための無音ループ(裏再生の安定化用) -->
+<audio id="silence" loop preload="auto" playsinline
+  src="data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQxAADB8AhSmxhIIEVCSiJrDCQBTcu3UrAIwUdkRgQbFAZC1CQEwTJ9mjRvBA4UOLD8nKVOWfh+UlK3z/177OXrfOdKl7pyn3Xf//WreyTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//tQxAADB8AhSmxhIIEVCSiJrDCQBTcu3UrAIwUdkRgQbFAZC1CQEwTJ9mjRvBA4UOLD8nKVOWfh+UlK3z/177OXrfOdKl7pyn3Xf//WreyTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//tQxAADB8AhSmxhIIEVCSiJrDCQBTcu3UrAIwUdkRgQbFAZC1CQEwTJ9mjRvBA4UOLD8nKVOWfh+UlK3z/177OXrfOdKl7pyn3Xf//WreyTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV"></audio>
 
 <script>
-const LS_KEY = 'focusTube.playlistId';
-const LS_CACHE = 'focusTube.cache.';
-let player = null, videoIds = [], currentIdx = -1, apiReady = false, pendingPl = null, manualMode = false;
-const $ = id => document.getElementById(id);
+// ▼ 固定する勉強用BGM動画ID(https://youtu.be/vr9dLvJs7VE)
+const FIXED_ID = 'vr9dLvJs7VE';
 
-function extractId(input){
-  input = (input || '').trim();
-  const m = input.match(/[?&]list=([A-Za-z0-9_-]+)/);
-  if (m) return m[1];
-  if (/^(PL|UU|LL|OL|RD)[A-Za-z0-9_-]{8,}$/.test(input)) return input;
-  return null;
+let player = null, apiReady = false;
+let currentTitle = '';
+let bgEnabled = true, isPlaying = false, posTimer = null;
+const $ = id => document.getElementById(id);
+const silence = $('silence');
+
+/* ===================== 集中タイマー ===================== */
+const TIMER_KEY = 'focusTube.timer.lastMin';
+let timerTotal = 25 * 60;   // 設定中の長さ(秒)
+let timerEnd = 0;           // 実行中の終了時刻(ms, wall-clock)
+let timerLeft = timerTotal; // 残り(秒)
+let timerRunning = false;
+let timerTick = null;
+let audioCtx = null;
+
+(function initTimerPref(){
+  const m = parseInt(localStorage.getItem(TIMER_KEY), 10);
+  if (m >= 1 && m <= 600){ setTimerMinutes(m, false); }
+})();
+
+function fmtClock(sec){
+  sec = Math.max(0, Math.ceil(sec));
+  const m = Math.floor(sec / 60), s = sec % 60;
+  return (m < 10 ? '0'+m : m) + ':' + (s < 10 ? '0'+s : s);
+}
+function renderTimer(){
+  $('timerDisplay').textContent = fmtClock(timerLeft);
+}
+function highlightPreset(min){
+  document.querySelectorAll('#presets .pre').forEach(b =>
+    b.classList.toggle('on', +b.dataset.min === min));
+}
+function setTimerMinutes(min, fromUser){
+  min = Math.max(1, Math.min(600, Math.round(min)));
+  stopTimer(false);
+  timerTotal = min * 60;
+  timerLeft = timerTotal;
+  $('timerCard').classList.remove('done');
+  renderTimer();
+  highlightPreset(min);
+  if (fromUser){ try{ localStorage.setItem(TIMER_KEY, String(min)); }catch(e){} }
 }
 
+function startTimer(){
+  if (timerRunning) return;
+  if (timerLeft <= 0) timerLeft = timerTotal;
+  timerEnd = Date.now() + timerLeft * 1000;
+  timerRunning = true;
+  $('timerCard').classList.add('running');
+  $('timerCard').classList.remove('done');
+  setStartBtn(true);
+  ensureAudio();
+  // タイマー開始とともにBGMを再生
+  if (player && player.playVideo) player.playVideo();
+  timerTick = setInterval(tickTimer, 250);
+  tickTimer();
+}
+function pauseTimer(){
+  if (!timerRunning) return;
+  timerLeft = Math.max(0, (timerEnd - Date.now()) / 1000);
+  timerRunning = false;
+  if (timerTick){ clearInterval(timerTick); timerTick = null; }
+  $('timerCard').classList.remove('running');
+  setStartBtn(false);
+  renderTimer();
+}
+function stopTimer(toZero){
+  timerRunning = false;
+  if (timerTick){ clearInterval(timerTick); timerTick = null; }
+  $('timerCard').classList.remove('running');
+  setStartBtn(false);
+  if (toZero) timerLeft = 0;
+  renderTimer();
+}
+function tickTimer(){
+  timerLeft = (timerEnd - Date.now()) / 1000;
+  if (timerLeft <= 0){
+    timerLeft = 0;
+    renderTimer();
+    finishTimer();
+    return;
+  }
+  renderTimer();
+}
+function finishTimer(){
+  stopTimer(true);
+  $('timerCard').classList.add('done');
+  // BGMを止めて区切りをつける
+  if (player && player.pauseVideo) player.pauseVideo();
+  chime();
+  if (navigator.vibrate) try{ navigator.vibrate([200,120,200,120,300]); }catch(e){}
+  showToast('⏰ お疲れさま!時間になりました');
+  notify('集中タイマー終了', 'お疲れさま!休憩しましょう ☕');
+}
+function setStartBtn(running){
+  const b = $('startBtn');
+  b.classList.toggle('pause', running);
+  b.textContent = running ? '⏸ 一時停止' : '▶ スタート';
+}
+
+// 終了アラーム音(WebAudioで生成。ユーザー操作後に有効化)
+function ensureAudio(){
+  try{
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  }catch(e){}
+}
+function beep(freq, start, dur){
+  if (!audioCtx) return;
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.type = 'sine'; o.frequency.value = freq;
+  o.connect(g); g.connect(audioCtx.destination);
+  const t = audioCtx.currentTime + start;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.4, t + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+function chime(){
+  ensureAudio();
+  if (!audioCtx) return;
+  // 軽やかな3音
+  beep(880, 0, 0.25); beep(1175, 0.28, 0.25); beep(1568, 0.56, 0.45);
+}
+
+let toastTimer = null;
+function showToast(msg){
+  const t = $('toast');
+  t.textContent = msg; t.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 4000);
+}
+function notify(title, body){
+  try{
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    new Notification(title, { body, icon:'icon-192.png' });
+  }catch(e){}
+}
+
+// タイマーUIのイベント
+document.querySelectorAll('#presets .pre').forEach(b => {
+  b.onclick = () => { $('customMin').value = ''; setTimerMinutes(+b.dataset.min, true); };
+});
+$('customMin').oninput = () => {
+  const v = parseInt($('customMin').value, 10);
+  if (v >= 1 && v <= 600) setTimerMinutes(v, true);
+};
+$('startBtn').onclick = () => {
+  ensureAudio();
+  if (timerRunning) pauseTimer(); else startTimer();
+  // 終了通知の許可を一度だけ確認
+  if ('Notification' in window && Notification.permission === 'default'){
+    try{ Notification.requestPermission(); }catch(e){}
+  }
+};
+$('resetTimer').onclick = () => {
+  stopTimer(false);
+  timerLeft = timerTotal;
+  $('timerCard').classList.remove('done');
+  renderTimer();
+};
+renderTimer();
+
+/* ===================== 再生時間の記録(日別) ===================== */
+const DAYS_KEY = 'focusTube.single.days';
+let days = {};
+try{ days = JSON.parse(localStorage.getItem(DAYS_KEY)) || {}; }catch(e){ days = {}; }
+let lastCT = null, lastWall = null, statsTimer = null, rafId = null, shownSec = -1, chartMode = 'day';
+
+const dayKey = d => (d || new Date()).toLocaleDateString('sv'); // YYYY-MM-DD(ローカル日付)
+function saveDays(){ try{ localStorage.setItem(DAYS_KEY, JSON.stringify(days)); }catch(e){} }
+
+// 旧バージョンの累計データがあれば引き継ぐ
+(function migrate(){
+  if (Object.keys(days).length) return;
+  const old = parseFloat(localStorage.getItem('focusTube.single.totalSec'));
+  if (old > 0){ days[dayKey()] = old; saveDays(); }
+})();
+
+function curTime(){
+  try{ return (player && player.getCurrentTime) ? player.getCurrentTime() : null; }
+  catch(e){ return null; }
+}
+function isReallyPlaying(){
+  try{ return !!(player && player.getPlayerState && player.getPlayerState() === YT.PlayerState.PLAYING); }
+  catch(e){ return false; }
+}
+// --- 計測(データ): 動画の再生位置と実時刻の「小さい方」だけ加算 ---
+function accumulate(){
+  const ct = curTime(), now = Date.now();
+  if (lastCT != null && lastWall != null && ct != null){
+    const add = Math.min(ct - lastCT, (now - lastWall) / 1000);
+    if (add > 0 && add < 60){ const k = dayKey(); days[k] = (days[k] || 0) + add; saveDays(); }
+  }
+  lastCT = ct; lastWall = now;
+}
+function paintLoop(){
+  rafId = requestAnimationFrame(paintLoop);
+  const sec = Math.floor(days[dayKey()] || 0);
+  if (sec !== shownSec){ shownSec = sec; renderStats(); }
+}
+function startStatsLoop(){
+  if (!statsTimer){ lastCT = null; lastWall = null; statsTimer = setInterval(accumulate, 1000); }
+  if (rafId == null){ shownSec = -1; rafId = requestAnimationFrame(paintLoop); }
+}
+function stopStatsLoop(){
+  accumulate();
+  if (statsTimer){ clearInterval(statsTimer); statsTimer = null; }
+  if (rafId != null){ cancelAnimationFrame(rafId); rafId = null; }
+  lastCT = null; lastWall = null;
+}
+
+function fmt(sec){
+  sec = Math.floor(sec);
+  const h = Math.floor(sec/3600), m = Math.floor(sec%3600/60), s = sec%60;
+  if (h > 0) return h+'<small>時間</small>'+m+'<small>分</small>';
+  if (m > 0) return m+'<small>分</small>'+s+'<small>秒</small>';
+  return s+'<small>秒</small>';
+}
+function fmtShort(sec){
+  if (sec >= 3600){ const h = sec/3600; return (h >= 10 ? Math.round(h) : (Math.round(h*10)/10)) + 'h'; }
+  if (sec >= 60) return Math.round(sec/60) + 'm';
+  return Math.round(sec) + 's';
+}
+
+function lastDays(n){
+  const arr = [];
+  for (let i = n-1; i >= 0; i--){
+    const d = new Date(); d.setDate(d.getDate() - i);
+    arr.push({ label:(d.getMonth()+1)+'/'+d.getDate(), sec: days[dayKey(d)] || 0 });
+  }
+  return arr;
+}
+function weekStart(date){
+  const x = new Date(date); const dow = (x.getDay()+6) % 7; // 月曜始まり
+  x.setDate(x.getDate() - dow); x.setHours(0,0,0,0); return x;
+}
+function lastWeeks(n){
+  const arr = []; const cur = weekStart(new Date());
+  for (let i = n-1; i >= 0; i--){
+    const ws = new Date(cur); ws.setDate(ws.getDate() - i*7);
+    let sec = 0;
+    for (let j = 0; j < 7; j++){ const d = new Date(ws); d.setDate(d.getDate()+j); sec += days[dayKey(d)] || 0; }
+    arr.push({ label:(ws.getMonth()+1)+'/'+ws.getDate(), sec });
+  }
+  return arr;
+}
+function lastMonths(n){
+  const arr = []; const now = new Date();
+  for (let i = n-1; i >= 0; i--){
+    const m = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    const prefix = dayKey(m).slice(0,7); // YYYY-MM
+    let sec = 0;
+    for (const k in days){ if (k.slice(0,7) === prefix) sec += days[k]; }
+    arr.push({ label:(m.getMonth()+1)+'月', sec });
+  }
+  return arr;
+}
+
+function renderChart(){
+  const data = chartMode==='day' ? lastDays(7) : chartMode==='week' ? lastWeeks(6) : lastMonths(6);
+  const max = Math.max(1, ...data.map(d => d.sec));
+  $('chart').innerHTML = data.map(d => {
+    const h = d.sec > 0 ? Math.max(4, Math.round(d.sec/max*100)) : 0;
+    return '<div class="col'+(d.sec>0?'':' zero')+'">'+
+      '<div class="bval">'+(d.sec>0 ? fmtShort(d.sec) : '')+'</div>'+
+      '<div class="barwrap"><div class="bar" style="height:'+h+'%"></div></div>'+
+      '<div class="blab">'+d.label+'</div></div>';
+  }).join('');
+}
+function renderStats(){
+  const total = Object.values(days).reduce((a,b) => a+b, 0);
+  $('totalV').innerHTML = fmt(total);
+  $('todayV').innerHTML = fmt(days[dayKey()] || 0);
+  renderChart();
+}
+
+/* ===================== YouTube IFRAME API ===================== */
 const tag = document.createElement('script');
 tag.src = 'https://www.youtube.com/iframe_api';
 document.head.appendChild(tag);
 window.onYouTubeIframeAPIReady = function(){
   apiReady = true;
-  if (pendingPl) loadPlaylist(pendingPl);
+  createPlayer();
 };
 
-function loadPlaylist(plId){
-  if (!apiReady){ pendingPl = plId; return; }
-  pendingPl = null;
-  $('setup').style.display = 'none';
-  $('playerWrap').style.display = 'block';
-  showStatus('再生リストを読み込み中…');
-
-  if (player){ player.destroy(); player = null; }
+function createPlayer(){
+  fetchTitle(FIXED_ID);
   player = new YT.Player('player', {
-    playerVars: {
-      listType:'playlist', list:plId,
-      rel:0, playsinline:1, iv_load_policy:3
-    },
+    videoId: FIXED_ID,
+    playerVars: { rel:0, playsinline:1, iv_load_policy:3, modestbranding:1 },
     events: {
-      onReady: () => pollPlaylist(plId),
-      onStateChange: onPlayerState,
-      onError: onPlayerError
+      onReady: () => {}, // 自動再生はしない(タイマーのスタート or ポスターのタップで開始)
+      onStateChange: onState,
+      onError: onError
     }
   });
-
-  const cached = localStorage.getItem(LS_CACHE + plId);
-  if (cached){
-    try{
-      const data = JSON.parse(cached);
-      videoIds = data.ids;
-      renderList(data.titles);
-      hideStatus();
-    }catch(e){}
-  }
 }
 
-function pollPlaylist(plId, tries=0){
-  let ids = null;
-  try{ ids = player.getPlaylist(); }catch(e){}
-  if (ids && ids.length){
-    if (JSON.stringify(ids) !== JSON.stringify(videoIds)){
-      videoIds = ids;
-      renderList(null);
-      fetchTitles(plId, ids);
-    }
-    hideStatus();
-    return;
-  }
-  if (tries > 60){
-    showStatus('リストを読み込めなかった😢<br>再生リストの公開設定が「非公開」になっていないか確認してみて。');
-    return;
-  }
-  setTimeout(() => pollPlaylist(plId, tries+1), 250);
-}
+// サムネイル+再生ボタン。タップで確実に再生を開始する
+$('poster').onclick = () => {
+  ensureAudio();
+  if (bgEnabled){ silence.play().catch(()=>{}); }
+  if (player && player.playVideo) player.playVideo();
+};
 
-function onPlayerError(e){
-  showStatus('動画を読み込めなかった(エラー' + e.data + ')。<br>リストの公開設定を「限定公開」にして、もう一度試してみて。');
-}
-
-async function fetchTitles(plId, ids){
-  const titles = {};
-  await Promise.all(ids.map(async id => {
-    try{
-      const r = await fetch('https://noembed.com/embed?url=https://www.youtube.com/watch?v=' + id);
-      const j = await r.json();
-      if (j.title) titles[id] = j.title;
-    }catch(e){}
-  }));
-  renderList(titles);
-  try{ localStorage.setItem(LS_CACHE + plId, JSON.stringify({ids, titles})); }catch(e){}
-}
-
-function renderList(titles){
-  const list = $('list');
-  list.innerHTML = '';
-  $('listHead').style.display = 'flex';
-  $('count').textContent = videoIds.length + '本';
-  videoIds.forEach((id, i) => {
-    const el = document.createElement('div');
-    el.className = 'item' + (i === currentIdx ? ' playing' : '');
-    el.dataset.idx = i;
-    const t = titles && titles[id] ? titles[id] : '動画 ' + (i+1);
-    el.innerHTML =
-      '<img class="thumb" loading="lazy" src="https://i.ytimg.com/vi/' + id + '/mqdefault.jpg">' +
-      '<div class="meta"><div class="title">' + escapeHtml(t) + '</div>' +
-      '<div class="idx">' + (i === currentIdx ? '▶ 再生中' : '#' + (i+1)) + '</div></div>';
-    el.onclick = () => playAt(i);
-    list.appendChild(el);
-  });
-}
-
-function playAt(i, scroll){
-  if (i < 0 || i >= videoIds.length) return;
-  manualMode = true;
-  currentIdx = i;
-  player.loadVideoById(videoIds[i]);
-  updatePlaying();
-  if (scroll !== false) window.scrollTo({top:0, behavior:'smooth'});
-}
-
-function onPlayerState(e){
+function onState(e){
   if (e.data === YT.PlayerState.PLAYING){
-    // 今実際に再生している動画に合わせてリストのハイライトを同期
-    try{
-      const m = player.getVideoUrl().match(/[?&]v=([A-Za-z0-9_-]+)/);
-      if (m){
-        const idx = videoIds.indexOf(m[1]);
-        if (idx !== -1 && idx !== currentIdx){ currentIdx = idx; updatePlaying(); }
-      }
-    }catch(err){}
-  }
-  if (e.data === YT.PlayerState.ENDED && manualMode){
-    // 動画が終わったら次の動画へ自動で進む
-    if (currentIdx > -1 && currentIdx < videoIds.length - 1) playAt(currentIdx + 1, false);
+    isPlaying = true;
+    $('poster').classList.add('hide');
+    $('playPause').textContent = '⏸ 一時停止';
+    setBgDot(true);
+    if (bgEnabled){ startSilence(); acquireWake(); }
+    updateMediaSession('playing');
+    startPositionSync();
+    startStatsLoop();
+  } else if (e.data === YT.PlayerState.PAUSED){
+    isPlaying = false;
+    $('playPause').textContent = '▶ 再生';
+    setBgDot(false);
+    updateMediaSession('paused');
+    stopPositionSync();
+    accumulate();
+    releaseWake();
+  } else if (e.data === YT.PlayerState.ENDED){
+    isPlaying = false;
+    $('playPause').textContent = '▶ 再生';
+    setBgDot(false);
+    stopSilence();
+    stopPositionSync();
+    accumulate();
+    releaseWake();
   }
 }
 
-function updatePlaying(){
-  document.querySelectorAll('.item').forEach(el => {
-    const i = +el.dataset.idx;
-    el.classList.toggle('playing', i === currentIdx);
-    el.querySelector('.idx').textContent = i === currentIdx ? '▶ 再生中' : '#' + (i+1);
+function onError(e){
+  $('vTitle').textContent = 'この動画は再生できませんでした(エラー' + e.data + ')。埋め込み再生が許可されているか確認してください。';
+}
+
+async function fetchTitle(id){
+  try{
+    const r = await fetch('https://noembed.com/embed?url=https://www.youtube.com/watch?v=' + id);
+    const j = await r.json();
+    currentTitle = j.title || ('動画 ' + id);
+  }catch(e){
+    currentTitle = '動画 ' + id;
+  }
+  $('vTitle').textContent = currentTitle;
+  setMediaMetadata();
+}
+
+/* ---- バックグラウンド再生の安定化 ---- */
+function setBgDot(on){ $('bgDot').classList.toggle('on', on); }
+function startSilence(){ silence.volume = 0; silence.play().catch(()=>{}); }
+function stopSilence(){ try{ silence.pause(); }catch(e){} }
+
+let wakeLock = null;
+async function acquireWake(){
+  if (!('wakeLock' in navigator) || !bgEnabled) return;
+  try{
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => { wakeLock = null; });
+  }catch(e){}
+}
+async function releaseWake(){
+  try{ if (wakeLock){ const w = wakeLock; wakeLock = null; await w.release(); } }catch(e){}
+}
+
+function onVisible(){
+  startStatsLoop();
+  // 復帰時にタイマー表示を実時刻から再計算(画面ロック中もズレない)
+  if (timerRunning){ tickTimer(); }
+  if (bgEnabled && isPlaying && player){
+    try{ if (player.getPlayerState() !== YT.PlayerState.PLAYING) player.playVideo(); }catch(e){}
+    acquireWake();
+  }
+  if (isReallyPlaying()) startPositionSync();
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden'){
+    stopStatsLoop();
+    stopPositionSync();
+  } else {
+    onVisible();
+  }
+});
+window.addEventListener('pageshow', () => { if (document.visibilityState !== 'hidden') onVisible(); });
+window.addEventListener('pagehide', stopStatsLoop);
+window.addEventListener('beforeunload', () => accumulate());
+
+// MediaSession(ロック画面 / 通知のメディア操作)
+function setMediaMetadata(){
+  if (!('mediaSession' in navigator)) return;
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title: currentTitle || 'FocusTube',
+    artist: 'FocusTube',
+    artwork: [
+      { src:'https://i.ytimg.com/vi/'+FIXED_ID+'/mqdefault.jpg', sizes:'320x180', type:'image/jpeg' },
+      { src:'https://i.ytimg.com/vi/'+FIXED_ID+'/hqdefault.jpg', sizes:'480x360', type:'image/jpeg' }
+    ]
   });
 }
-
-function showStatus(msg){ const s = $('status'); s.style.display = 'block'; s.innerHTML = msg; }
-function hideStatus(){ $('status').style.display = 'none'; }
-function escapeHtml(s){ return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-
-function startWith(raw){
-  const id = extractId(raw);
-  if (!id){
-    const e = $('setupErr');
-    e.style.display = 'block';
-    e.textContent = 'URLから再生リストIDが見つからなかった。動画単体じゃなくて「再生リスト」のURL(list=を含む)をコピーしてね。';
-    return;
-  }
-  $('setupErr').style.display = 'none';
-  localStorage.setItem(LS_KEY, id);
-  videoIds = []; currentIdx = -1;
-  loadPlaylist(id);
+function updateMediaSession(state){
+  if (!('mediaSession' in navigator)) return;
+  navigator.mediaSession.playbackState = state;
+}
+function setupMediaHandlers(){
+  if (!('mediaSession' in navigator)) return;
+  const set = (a, fn) => { try{ navigator.mediaSession.setActionHandler(a, fn); }catch(e){} };
+  set('play',  () => { if(player) player.playVideo(); });
+  set('pause', () => { if(player) player.pauseVideo(); });
+  set('seekbackward', d => { if(player) player.seekTo(Math.max(0, player.getCurrentTime() - (d.seekOffset||10)), true); });
+  set('seekforward',  d => { if(player) player.seekTo(player.getCurrentTime() + (d.seekOffset||10), true); });
+  set('seekto', d => { if(player && d.seekTime!=null) player.seekTo(d.seekTime, true); });
+  set('stop',  () => { if(player) player.pauseVideo(); });
 }
 
-$('pasteBtn').onclick = async () => {
-  try{
-    const text = await navigator.clipboard.readText();
-    startWith(text);
-  }catch(e){
-    $('plInput').focus();
-    alert('クリップボードを読めなかったので、入力欄に長押しでペーストしてね');
-  }
+function startPositionSync(){
+  if (!('mediaSession' in navigator) || !('setPositionState' in navigator.mediaSession)) return;
+  stopPositionSync();
+  posTimer = setInterval(() => {
+    try{
+      const dur = player.getDuration(), pos = player.getCurrentTime();
+      if (dur > 0) navigator.mediaSession.setPositionState({ duration:dur, position:Math.min(pos,dur), playbackRate:1 });
+    }catch(e){}
+  }, 1000);
+}
+function stopPositionSync(){ if(posTimer){ clearInterval(posTimer); posTimer = null; } }
+
+/* ---- 動画コントロール ---- */
+$('playPause').onclick = () => {
+  if (!player) return;
+  ensureAudio();
+  if (isPlaying) player.pauseVideo(); else player.playVideo();
 };
-$('saveBtn').onclick = () => startWith($('plInput').value);
-$('settingsBtn').onclick = () => {
-  $('setup').style.display = 'block';
-  $('plInput').value = '';
-  $('setupErr').style.display = 'none';
-  window.scrollTo(0,0);
+$('bgToggle').onclick = () => {
+  bgEnabled = !bgEnabled;
+  const b = $('bgToggle');
+  b.classList.toggle('on', bgEnabled);
+  b.textContent = bgEnabled ? '🌙 BG: ON' : '🌙 BG: OFF';
+  $('bgText').innerHTML = bgEnabled
+    ? 'BG: <b>ON</b>。再生中は<b>画面を消さず</b>に流し続けます(自動ロックで止まるのを防止)。'
+    : 'BG: <b>OFF</b>。画面が自動でロックされると再生も止まります。';
+  if (bgEnabled && isPlaying){ startSilence(); acquireWake(); }
+  else { stopSilence(); releaseWake(); }
+};
+$('replay').onclick = () => { if(player){ player.seekTo(0, true); player.playVideo(); } };
+$('resetBtn').onclick = () => {
+  if (!confirm('すべての再生記録をリセットしますか?')) return;
+  days = {}; saveDays();
+  renderStats();
 };
 
-const saved = localStorage.getItem(LS_KEY);
-if (saved) loadPlaylist(saved);
+document.querySelectorAll('#chartTabs .tab').forEach(t => {
+  t.onclick = () => {
+    chartMode = t.dataset.m;
+    document.querySelectorAll('#chartTabs .tab').forEach(x => x.classList.toggle('on', x === t));
+    renderChart();
+  };
+});
+
+renderStats();
+setupMediaHandlers();
+if (document.visibilityState !== 'hidden') startStatsLoop();
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
