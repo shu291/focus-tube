@@ -10,7 +10,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
-<title>FocusTube · 勉強タイマー</title>
+<title>FocusTube · 勉強BGM</title>
 <style>
 :root{
   --bg:#0d1117; --panel:#161b22; --panel2:#1c2330; --line:#2a3344;
@@ -59,55 +59,6 @@ header .badge{font-size:12px;color:var(--sub);border:1px solid var(--line);borde
 #info{max-width:680px;margin:0 auto;padding:16px 16px 0}
 #vTitle{font-size:16px;font-weight:700;line-height:1.5}
 
-/* ---- 勉強タイマー ---- */
-#timerCard{
-  margin-top:14px;background:var(--panel);border:1px solid var(--line);border-radius:14px;
-  padding:18px 16px;text-align:center;
-}
-#timerCard.done{border-color:var(--ok);box-shadow:0 0 0 1px var(--ok) inset}
-#timerHead{display:flex;align-items:center;justify-content:center;position:relative;margin-bottom:6px}
-#timerLabel{font-size:12px;color:var(--sub);letter-spacing:.06em}
-#timerToggle{
-  position:absolute;right:0;top:50%;transform:translateY(-50%);
-  background:var(--panel2);border:1px solid var(--line);color:var(--sub);
-  border-radius:7px;padding:4px 9px;font-size:11px;font-weight:600;cursor:pointer;
-}
-#timerDisplay{
-  font-size:56px;font-weight:800;line-height:1;letter-spacing:.01em;
-  font-variant-numeric:tabular-nums;
-}
-/* コンパクト表示: 数字を小さく、設定UIを隠す */
-#timerCard.compact{padding:12px 14px}
-#timerCard.compact #timerDisplay{font-size:26px}
-#timerCard.compact #presets,
-#timerCard.compact #customRow{display:none}
-#timerCard.compact #timerBtns{margin-top:10px}
-#timerCard.running #timerDisplay{color:var(--accent)}
-#timerCard.done #timerDisplay{color:var(--ok)}
-#presets{display:flex;gap:8px;margin-top:14px}
-#presets .pre{
-  flex:1;background:var(--panel2);border:1px solid var(--line);color:var(--sub);
-  border-radius:9px;padding:9px 4px;font-size:13px;font-weight:600;cursor:pointer;
-}
-#presets .pre.on{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
-#presets .pre.test{flex:0 0 auto;padding:9px 12px;color:var(--warn)}
-#presets .pre.test.on{background:rgba(210,153,34,.16);border-color:var(--warn);color:var(--warn)}
-#customRow{display:flex;gap:8px;margin-top:8px;align-items:center}
-#customMin{
-  flex:1;background:var(--panel2);border:1px solid var(--line);color:var(--text);
-  border-radius:9px;padding:10px 12px;font-size:14px;outline:none;text-align:center;
-}
-#customMin:focus{border-color:var(--accent)}
-#customRow .unit{font-size:13px;color:var(--sub)}
-#timerBtns{display:flex;gap:8px;margin-top:12px}
-#timerBtns button{
-  flex:1;border-radius:10px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;
-  border:1px solid var(--line);
-}
-#startBtn{background:var(--accent);color:#06121c;border-color:var(--accent)}
-#startBtn.pause{background:var(--warn);border-color:var(--warn);color:#1a1300}
-#resetTimer{background:var(--panel2);color:var(--text);flex:0 0 auto;padding-left:18px;padding-right:18px}
-
 #bgState{
   margin-top:14px;display:flex;align-items:center;gap:10px;
   background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;
@@ -148,23 +99,6 @@ header .badge{font-size:12px;color:var(--sub);border:1px solid var(--line);borde
 #bgToggle.on{border-color:var(--ok);color:var(--ok)}
 #replay{flex:0 0 auto}
 #fsBtn{background:var(--accent);color:#06121c;border-color:var(--accent);font-weight:700}
-
-#note{max-width:680px;margin:18px auto 40px;padding:0 16px}
-#note .card{
-  background:var(--panel);border:1px solid var(--line);border-radius:12px;
-  padding:14px;font-size:12.5px;color:var(--sub);line-height:1.9;
-}
-#note .card b{color:var(--text)}
-#note .card .tag{display:inline-block;background:var(--accent-dim);color:var(--accent);
-  border-radius:6px;padding:1px 7px;font-size:11px;font-weight:700;margin-right:6px}
-
-#toast{
-  position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);
-  background:var(--ok);color:#04210d;font-weight:700;font-size:14px;
-  padding:13px 20px;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.5);
-  z-index:50;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;white-space:nowrap;
-}
-#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 </style>
 </head>
 <body>
@@ -183,28 +117,6 @@ header .badge{font-size:12px;color:var(--sub);border:1px solid var(--line);borde
 
 <div id="info">
   <div id="vTitle">読み込み中…</div>
-
-  <div id="timerCard">
-    <div id="timerHead">
-      <span id="timerLabel">集中タイマー</span>
-      <button id="timerToggle" title="表示を小さく/大きく">小さく</button>
-    </div>
-    <div id="timerDisplay">25:00</div>
-    <div id="presets">
-      <button class="pre on" data-min="25">25分</button>
-      <button class="pre" data-min="50">50分</button>
-      <button class="pre" data-min="90">90分</button>
-      <button class="pre test" data-sec="3">3秒</button>
-    </div>
-    <div id="customRow">
-      <input id="customMin" type="number" inputmode="numeric" min="1" max="600" placeholder="自由設定">
-      <span class="unit">分</span>
-    </div>
-    <div id="timerBtns">
-      <button id="startBtn">▶ スタート</button>
-      <button id="resetTimer">リセット</button>
-    </div>
-  </div>
 
   <div id="bgState">
     <span id="bgDot"></span>
@@ -234,8 +146,6 @@ header .badge{font-size:12px;color:var(--sub);border:1px solid var(--line);borde
   <button id="replay">↺ 頭から</button>
 </div>
 
-<div id="toast"></div>
-
 <!-- 音声セッションを保持するための無音ループ(裏再生の安定化用) -->
 <audio id="silence" loop preload="auto" playsinline
   src="data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQxAADB8AhSmxhIIEVCSiJrDCQBTcu3UrAIwUdkRgQbFAZC1CQEwTJ9mjRvBA4UOLD8nKVOWfh+UlK3z/177OXrfOdKl7pyn3Xf//WreyTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//tQxAADB8AhSmxhIIEVCSiJrDCQBTcu3UrAIwUdkRgQbFAZC1CQEwTJ9mjRvBA4UOLD8nKVOWfh+UlK3z/177OXrfOdKl7pyn3Xf//WreyTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//tQxAADB8AhSmxhIIEVCSiJrDCQBTcu3UrAIwUdkRgQbFAZC1CQEwTJ9mjRvBA4UOLD8nKVOWfh+UlK3z/177OXrfOdKl7pyn3Xf//WreyTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV"></audio>
@@ -249,179 +159,6 @@ let currentTitle = '';
 let bgEnabled = true, isPlaying = false, posTimer = null;
 const $ = id => document.getElementById(id);
 const silence = $('silence');
-
-/* ===================== 集中タイマー ===================== */
-const TIMER_KEY = 'focusTube.timer.lastMin';
-let timerTotal = 25 * 60;   // 設定中の長さ(秒)
-let timerEnd = 0;           // 実行中の終了時刻(ms, wall-clock)
-let timerLeft = timerTotal; // 残り(秒)
-let timerRunning = false;
-let timerTick = null;
-let audioCtx = null;
-
-(function initTimerPref(){
-  const s = parseInt(localStorage.getItem(TIMER_KEY), 10);
-  if (s >= 1 && s <= 36000){ setTimerSeconds(s, false); }
-})();
-
-function fmtClock(sec){
-  sec = Math.max(0, Math.ceil(sec));
-  const m = Math.floor(sec / 60), s = sec % 60;
-  return (m < 10 ? '0'+m : m) + ':' + (s < 10 ? '0'+s : s);
-}
-function renderTimer(){
-  $('timerDisplay').textContent = fmtClock(timerLeft);
-}
-function presetSeconds(b){ return b.dataset.sec ? +b.dataset.sec : (+b.dataset.min) * 60; }
-function highlightPreset(totalSec){
-  document.querySelectorAll('#presets .pre').forEach(b =>
-    b.classList.toggle('on', presetSeconds(b) === totalSec));
-}
-function setTimerSeconds(sec, fromUser){
-  sec = Math.max(1, Math.min(36000, Math.round(sec)));
-  stopTimer(false);
-  timerTotal = sec;
-  timerLeft = sec;
-  $('timerCard').classList.remove('done');
-  renderTimer();
-  highlightPreset(sec);
-  if (fromUser){ try{ localStorage.setItem(TIMER_KEY, String(sec)); }catch(e){} }
-}
-function setTimerMinutes(min, fromUser){ setTimerSeconds(Math.round(min * 60), fromUser); }
-
-function startTimer(){
-  if (timerRunning) return;
-  if (timerLeft <= 0) timerLeft = timerTotal;
-  timerEnd = Date.now() + timerLeft * 1000;
-  timerRunning = true;
-  $('timerCard').classList.add('running');
-  $('timerCard').classList.remove('done');
-  setStartBtn(true);
-  ensureAudio();
-  // タイマー開始とともにBGMを再生
-  if (player && player.playVideo) player.playVideo();
-  timerTick = setInterval(tickTimer, 250);
-  tickTimer();
-}
-function pauseTimer(){
-  if (!timerRunning) return;
-  timerLeft = Math.max(0, (timerEnd - Date.now()) / 1000);
-  timerRunning = false;
-  if (timerTick){ clearInterval(timerTick); timerTick = null; }
-  $('timerCard').classList.remove('running');
-  setStartBtn(false);
-  renderTimer();
-}
-function stopTimer(toZero){
-  timerRunning = false;
-  if (timerTick){ clearInterval(timerTick); timerTick = null; }
-  $('timerCard').classList.remove('running');
-  setStartBtn(false);
-  if (toZero) timerLeft = 0;
-  renderTimer();
-}
-function tickTimer(){
-  timerLeft = (timerEnd - Date.now()) / 1000;
-  if (timerLeft <= 0){
-    timerLeft = 0;
-    renderTimer();
-    finishTimer();
-    return;
-  }
-  renderTimer();
-}
-function finishTimer(){
-  stopTimer(true);
-  $('timerCard').classList.add('done');
-  // BGMを止めて区切りをつける
-  if (player && player.pauseVideo) player.pauseVideo();
-  chime();
-  if (navigator.vibrate) try{ navigator.vibrate([200,120,200,120,300]); }catch(e){}
-  showToast('⏰ お疲れさま!時間になりました');
-  notify('集中タイマー終了', 'お疲れさま!休憩しましょう ☕');
-}
-function setStartBtn(running){
-  const b = $('startBtn');
-  b.classList.toggle('pause', running);
-  b.textContent = running ? '⏸ 一時停止' : '▶ スタート';
-}
-
-// 終了アラーム音(WebAudioで生成。ユーザー操作後に有効化)
-function ensureAudio(){
-  try{
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-  }catch(e){}
-}
-function beep(freq, start, dur){
-  if (!audioCtx) return;
-  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
-  o.type = 'sine'; o.frequency.value = freq;
-  o.connect(g); g.connect(audioCtx.destination);
-  const t = audioCtx.currentTime + start;
-  g.gain.setValueAtTime(0.0001, t);
-  g.gain.exponentialRampToValueAtTime(0.4, t + 0.02);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  o.start(t); o.stop(t + dur + 0.02);
-}
-function chime(){
-  ensureAudio();
-  if (!audioCtx) return;
-  // 軽やかな3音
-  beep(880, 0, 0.25); beep(1175, 0.28, 0.25); beep(1568, 0.56, 0.45);
-}
-
-let toastTimer = null;
-function showToast(msg){
-  const t = $('toast');
-  t.textContent = msg; t.classList.add('show');
-  if (toastTimer) clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 4000);
-}
-function notify(title, body){
-  try{
-    if (!('Notification' in window) || Notification.permission !== 'granted') return;
-    new Notification(title, { body, icon:'icon-192.png' });
-  }catch(e){}
-}
-
-// タイマーUIのイベント
-document.querySelectorAll('#presets .pre').forEach(b => {
-  b.onclick = () => { $('customMin').value = ''; setTimerSeconds(presetSeconds(b), true); };
-});
-$('customMin').oninput = () => {
-  const v = parseInt($('customMin').value, 10);
-  if (v >= 1 && v <= 600) setTimerMinutes(v, true);
-};
-$('startBtn').onclick = () => {
-  ensureAudio();
-  if (timerRunning) pauseTimer(); else startTimer();
-  // 終了通知の許可を一度だけ確認
-  if ('Notification' in window && Notification.permission === 'default'){
-    try{ Notification.requestPermission(); }catch(e){}
-  }
-};
-$('resetTimer').onclick = () => {
-  stopTimer(false);
-  timerLeft = timerTotal;
-  $('timerCard').classList.remove('done');
-  renderTimer();
-};
-
-// 表示を小さく(コンパクト)するトグル
-const COMPACT_KEY = 'focusTube.timer.compact';
-function applyCompact(on){
-  $('timerCard').classList.toggle('compact', on);
-  $('timerToggle').textContent = on ? '大きく' : '小さく';
-}
-$('timerToggle').onclick = () => {
-  const on = !$('timerCard').classList.contains('compact');
-  applyCompact(on);
-  try{ localStorage.setItem(COMPACT_KEY, on ? '1' : '0'); }catch(e){}
-};
-applyCompact(localStorage.getItem(COMPACT_KEY) === '1');
-
-renderTimer();
 
 /* ===================== 再生時間の記録(日別) ===================== */
 const DAYS_KEY = 'focusTube.single.days';
@@ -552,7 +289,7 @@ function createPlayer(){
     videoId: FIXED_ID,
     playerVars: { rel:0, playsinline:1, iv_load_policy:3, modestbranding:1 },
     events: {
-      onReady: () => {}, // 自動再生はしない(タイマーのスタート or ポスターのタップで開始)
+      onReady: () => {}, // 自動再生はしない(ポスターのタップ or 全画面ボタンで開始)
       onStateChange: onState,
       onError: onError
     }
@@ -561,7 +298,6 @@ function createPlayer(){
 
 // サムネイル+再生ボタン。タップで確実に再生を開始する
 $('poster').onclick = () => {
-  ensureAudio();
   if (bgEnabled){ silence.play().catch(()=>{}); }
   if (player && player.playVideo) player.playVideo();
 };
@@ -630,8 +366,6 @@ async function releaseWake(){
 
 function onVisible(){
   startStatsLoop();
-  // 復帰時にタイマー表示を実時刻から再計算(画面ロック中もズレない)
-  if (timerRunning){ tickTimer(); }
   if (bgEnabled && isPlaying && player){
     try{ if (player.getPlayerState() !== YT.PlayerState.PLAYING) player.playVideo(); }catch(e){}
     acquireWake();
@@ -692,7 +426,6 @@ function stopPositionSync(){ if(posTimer){ clearInterval(posTimer); posTimer = n
 /* ---- 動画コントロール ---- */
 $('playPause').onclick = () => {
   if (!player) return;
-  ensureAudio();
   if (isPlaying) player.pauseVideo(); else player.playVideo();
 };
 $('bgToggle').onclick = () => {
@@ -709,7 +442,6 @@ $('bgToggle').onclick = () => {
 $('replay').onclick = () => { if(player){ player.seekTo(0, true); player.playVideo(); } };
 // 再生して全画面にする
 $('fsBtn').onclick = () => {
-  ensureAudio();
   if (player && player.playVideo) player.playVideo();
   const iframe = (player && player.getIframe) ? player.getIframe() : null;
   // iframe → ラッパーの順で全画面APIを試す(ブラウザ差を吸収)
