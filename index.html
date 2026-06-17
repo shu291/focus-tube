@@ -65,11 +65,23 @@ header .badge{font-size:12px;color:var(--sub);border:1px solid var(--line);borde
   padding:18px 16px;text-align:center;
 }
 #timerCard.done{border-color:var(--ok);box-shadow:0 0 0 1px var(--ok) inset}
-#timerLabel{font-size:12px;color:var(--sub);letter-spacing:.06em;margin-bottom:6px}
+#timerHead{display:flex;align-items:center;justify-content:center;position:relative;margin-bottom:6px}
+#timerLabel{font-size:12px;color:var(--sub);letter-spacing:.06em}
+#timerToggle{
+  position:absolute;right:0;top:50%;transform:translateY(-50%);
+  background:var(--panel2);border:1px solid var(--line);color:var(--sub);
+  border-radius:7px;padding:4px 9px;font-size:11px;font-weight:600;cursor:pointer;
+}
 #timerDisplay{
   font-size:56px;font-weight:800;line-height:1;letter-spacing:.01em;
   font-variant-numeric:tabular-nums;
 }
+/* コンパクト表示: 数字を小さく、設定UIを隠す */
+#timerCard.compact{padding:12px 14px}
+#timerCard.compact #timerDisplay{font-size:26px}
+#timerCard.compact #presets,
+#timerCard.compact #customRow{display:none}
+#timerCard.compact #timerBtns{margin-top:10px}
 #timerCard.running #timerDisplay{color:var(--accent)}
 #timerCard.done #timerDisplay{color:var(--ok)}
 #presets{display:flex;gap:8px;margin-top:14px}
@@ -172,7 +184,10 @@ header .badge{font-size:12px;color:var(--sub);border:1px solid var(--line);borde
   <div id="vTitle">読み込み中…</div>
 
   <div id="timerCard">
-    <div id="timerLabel">集中タイマー</div>
+    <div id="timerHead">
+      <span id="timerLabel">集中タイマー</span>
+      <button id="timerToggle" title="表示を小さく/大きく">小さく</button>
+    </div>
     <div id="timerDisplay">25:00</div>
     <div id="presets">
       <button class="pre on" data-min="25">25分</button>
@@ -388,6 +403,20 @@ $('resetTimer').onclick = () => {
   $('timerCard').classList.remove('done');
   renderTimer();
 };
+
+// 表示を小さく(コンパクト)するトグル
+const COMPACT_KEY = 'focusTube.timer.compact';
+function applyCompact(on){
+  $('timerCard').classList.toggle('compact', on);
+  $('timerToggle').textContent = on ? '大きく' : '小さく';
+}
+$('timerToggle').onclick = () => {
+  const on = !$('timerCard').classList.contains('compact');
+  applyCompact(on);
+  try{ localStorage.setItem(COMPACT_KEY, on ? '1' : '0'); }catch(e){}
+};
+applyCompact(localStorage.getItem(COMPACT_KEY) === '1');
+
 renderTimer();
 
 /* ===================== 再生時間の記録(日別) ===================== */
