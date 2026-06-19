@@ -80,15 +80,6 @@ header .badge{font-size:12px;color:var(--sub);border:1px solid var(--line);borde
 .subjList .empty{font-size:12.5px;color:var(--sub)}
 #subjTotal .barwrap .b{background:linear-gradient(90deg,var(--warn),#a06f10)}
 
-#bgState{
-  margin-top:14px;display:flex;align-items:center;gap:10px;
-  background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;
-}
-#bgDot{width:10px;min-width:10px;height:10px;border-radius:50%;background:var(--sub);transition:background .2s}
-#bgDot.on{background:var(--ok);box-shadow:0 0 8px var(--ok)}
-#bgText{font-size:13px;color:var(--sub);line-height:1.6}
-#bgText b{color:var(--text)}
-
 #stats{margin-top:14px;display:flex;gap:10px}
 #stats .stat{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 10px;text-align:center}
 #stats .stat .k{font-size:11px;color:var(--sub);letter-spacing:.04em}
@@ -145,10 +136,6 @@ header .badge{font-size:12px;color:var(--sub);border:1px solid var(--line);borde
     <div id="subjBtns"></div>
   </div>
 
-  <div id="bgState">
-    <span id="bgDot"></span>
-    <span id="bgText">BG: <b>ON</b>。再生中は<b>画面を消さず</b>に流し続けます(自動ロックで止まるのを防止)。</span>
-  </div>
   <div id="stats">
     <div class="stat total"><div class="k">累計</div><div class="v" id="totalV">0<small>秒</small></div></div>
     <div class="stat"><div class="k">今日</div><div class="v" id="todayV">0<small>秒</small></div></div>
@@ -406,7 +393,6 @@ function onState(e){
     isPlaying = true;
     $('poster').classList.add('hide');
     $('playPause').textContent = '⏸ 一時停止';
-    setBgDot(true);
     if (bgEnabled){ startSilence(); acquireWake(); }
     updateMediaSession('playing');
     startPositionSync();
@@ -414,7 +400,6 @@ function onState(e){
   } else if (e.data === YT.PlayerState.PAUSED){
     isPlaying = false;
     $('playPause').textContent = '▶ 再生';
-    setBgDot(false);
     updateMediaSession('paused');
     stopPositionSync();
     accumulate();
@@ -422,7 +407,6 @@ function onState(e){
   } else if (e.data === YT.PlayerState.ENDED){
     isPlaying = false;
     $('playPause').textContent = '▶ 再生';
-    setBgDot(false);
     stopSilence();
     stopPositionSync();
     accumulate();
@@ -447,7 +431,6 @@ async function fetchTitle(id){
 }
 
 /* ---- バックグラウンド再生の安定化 ---- */
-function setBgDot(on){ $('bgDot').classList.toggle('on', on); }
 function startSilence(){ silence.volume = 0; silence.play().catch(()=>{}); }
 function stopSilence(){ try{ silence.pause(); }catch(e){} }
 
@@ -532,9 +515,6 @@ $('bgToggle').onclick = () => {
   const b = $('bgToggle');
   b.classList.toggle('on', bgEnabled);
   b.textContent = bgEnabled ? '🌙 BG: ON' : '🌙 BG: OFF';
-  $('bgText').innerHTML = bgEnabled
-    ? 'BG: <b>ON</b>。再生中は<b>画面を消さず</b>に流し続けます(自動ロックで止まるのを防止)。'
-    : 'BG: <b>OFF</b>。画面が自動でロックされると再生も止まります。';
   if (bgEnabled && isPlaying){ startSilence(); acquireWake(); }
   else { stopSilence(); releaseWake(); }
 };
