@@ -59,6 +59,26 @@ header .badge{font-size:12px;color:var(--sub);border:1px solid var(--line);borde
 #info{max-width:680px;margin:0 auto;padding:16px 16px 0}
 #vTitle{font-size:16px;font-weight:700;line-height:1.5}
 
+#subjCard{margin-top:14px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 14px}
+#subjCard .lbl{font-size:11px;color:var(--sub);letter-spacing:.04em;margin-bottom:10px}
+#subjBtns{display:flex;flex-wrap:wrap;gap:7px}
+#subjBtns .subj{
+  background:var(--panel2);border:1px solid var(--line);color:var(--sub);
+  border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;
+}
+#subjBtns .subj.on{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
+
+#subjBreak{margin-top:12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 14px}
+#subjBreak .lbl{font-size:11px;color:var(--sub);letter-spacing:.04em;margin-bottom:11px}
+#subjBreak .row{display:flex;align-items:center;gap:10px;margin-top:9px}
+#subjBreak .row:first-of-type{margin-top:0}
+#subjBreak .nm{font-size:13px;width:48px;min-width:48px;color:var(--text)}
+#subjBreak .barwrap{flex:1;background:var(--panel2);border-radius:6px;height:9px;overflow:hidden}
+#subjBreak .barwrap .b{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#2b7fb8);border-radius:6px;transition:width .3s}
+#subjBreak .tm{font-size:12px;color:var(--sub);min-width:64px;text-align:right;font-variant-numeric:tabular-nums}
+#subjBreak .tm small{margin:0 1px}
+#subjBreak .empty{font-size:12.5px;color:var(--sub)}
+
 #bgState{
   margin-top:14px;display:flex;align-items:center;gap:10px;
   background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;
@@ -74,6 +94,7 @@ header .badge{font-size:12px;color:var(--sub);border:1px solid var(--line);borde
 #stats .stat .v{font-size:19px;font-weight:700;margin-top:5px;font-variant-numeric:tabular-nums}
 #stats .stat .v small{font-size:12px;color:var(--sub);font-weight:600;margin:0 1px}
 #stats .stat.total .v{color:var(--accent)}
+#stats .stat.streak .v{color:var(--warn)}
 
 #chartCard{margin-top:12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
 #chartTabs{display:flex;gap:6px;margin-bottom:14px}
@@ -118,14 +139,21 @@ header .badge{font-size:12px;color:var(--sub);border:1px solid var(--line);borde
 <div id="info">
   <div id="vTitle">読み込み中…</div>
 
+  <div id="subjCard">
+    <div class="lbl">📚 いまの教科</div>
+    <div id="subjBtns"></div>
+  </div>
+
   <div id="bgState">
     <span id="bgDot"></span>
     <span id="bgText">BG: <b>ON</b>。再生中は<b>画面を消さず</b>に流し続けます(自動ロックで止まるのを防止)。</span>
   </div>
   <div id="stats">
-    <div class="stat total"><div class="k">累計再生時間</div><div class="v" id="totalV">0<small>秒</small></div></div>
+    <div class="stat total"><div class="k">累計</div><div class="v" id="totalV">0<small>秒</small></div></div>
     <div class="stat"><div class="k">今日</div><div class="v" id="todayV">0<small>秒</small></div></div>
+    <div class="stat streak"><div class="k">🔥 連続</div><div class="v" id="streakV">0<small>日</small></div></div>
   </div>
+  <div id="subjBreak"></div>
   <div id="chartCard">
     <div id="chartTabs">
       <button class="tab on" data-m="day">日</button>
@@ -169,6 +197,16 @@ let lastCT = null, lastWall = null, statsTimer = null, rafId = null, shownSec = 
 const dayKey = d => (d || new Date()).toLocaleDateString('sv'); // YYYY-MM-DD(ローカル日付)
 function saveDays(){ try{ localStorage.setItem(DAYS_KEY, JSON.stringify(days)); }catch(e){} }
 
+/* ---- 教科ごとの記録 ---- */
+const SUBJECTS = ['数学','英語','国語','理科','社会','その他'];
+const SUBJ_KEY = 'focusTube.subjects.days';     // { 'YYYY-MM-DD': { 教科: 秒 } }
+const SUBJ_CUR_KEY = 'focusTube.subjects.current';
+let subjDays = {};
+try{ subjDays = JSON.parse(localStorage.getItem(SUBJ_KEY)) || {}; }catch(e){ subjDays = {}; }
+let curSubj = localStorage.getItem(SUBJ_CUR_KEY) || SUBJECTS[0];
+if (!SUBJECTS.includes(curSubj)) curSubj = SUBJECTS[0];
+function saveSubj(){ try{ localStorage.setItem(SUBJ_KEY, JSON.stringify(subjDays)); }catch(e){} }
+
 // 旧バージョンの累計データがあれば引き継ぐ
 (function migrate(){
   if (Object.keys(days).length) return;
@@ -189,7 +227,12 @@ function accumulate(){
   const ct = curTime(), now = Date.now();
   if (lastCT != null && lastWall != null && ct != null){
     const add = Math.min(ct - lastCT, (now - lastWall) / 1000);
-    if (add > 0 && add < 60){ const k = dayKey(); days[k] = (days[k] || 0) + add; saveDays(); }
+    if (add > 0 && add < 60){
+      const k = dayKey();
+      days[k] = (days[k] || 0) + add; saveDays();
+      const sd = subjDays[k] || (subjDays[k] = {});
+      sd[curSubj] = (sd[curSubj] || 0) + add; saveSubj();
+    }
   }
   lastCT = ct; lastWall = now;
 }
@@ -267,10 +310,51 @@ function renderChart(){
       '<div class="blab">'+d.label+'</div></div>';
   }).join('');
 }
+// 連続記録: 1分以上勉強した日が何日続いているか(今日がまだなら昨日から数える)
+function calcStreak(){
+  const MIN = 60;
+  let streak = 0;
+  const d = new Date();
+  if (!((days[dayKey(d)] || 0) >= MIN)) d.setDate(d.getDate() - 1);
+  while ((days[dayKey(d)] || 0) >= MIN){ streak++; d.setDate(d.getDate() - 1); }
+  return streak;
+}
+
+function renderSubjBtns(){
+  $('subjBtns').innerHTML = SUBJECTS.map(s =>
+    '<button class="subj'+(s===curSubj?' on':'')+'" data-s="'+s+'">'+s+'</button>').join('');
+  document.querySelectorAll('#subjBtns .subj').forEach(b => {
+    b.onclick = () => {
+      if (statsTimer) accumulate(); // 切替前にここまでの分を今の教科へ確定
+      curSubj = b.dataset.s;
+      try{ localStorage.setItem(SUBJ_CUR_KEY, curSubj); }catch(e){}
+      document.querySelectorAll('#subjBtns .subj').forEach(x => x.classList.toggle('on', x === b));
+    };
+  });
+}
+
+function renderSubjBreak(){
+  const sd = subjDays[dayKey()] || {};
+  const rows = SUBJECTS.map(s => ({ name:s, sec: sd[s] || 0 }))
+    .filter(r => r.sec > 0).sort((a,b) => b.sec - a.sec);
+  const wrap = $('subjBreak');
+  if (!rows.length){
+    wrap.innerHTML = '<div class="lbl">今日の教科別</div><div class="empty">まだ記録がありません</div>';
+    return;
+  }
+  const max = Math.max(...rows.map(r => r.sec));
+  wrap.innerHTML = '<div class="lbl">今日の教科別</div>' + rows.map(r =>
+    '<div class="row"><span class="nm">'+r.name+'</span>'+
+    '<span class="barwrap"><span class="b" style="width:'+Math.max(6, Math.round(r.sec/max*100))+'%"></span></span>'+
+    '<span class="tm">'+fmt(r.sec)+'</span></div>').join('');
+}
+
 function renderStats(){
   const total = Object.values(days).reduce((a,b) => a+b, 0);
   $('totalV').innerHTML = fmt(total);
   $('todayV').innerHTML = fmt(days[dayKey()] || 0);
+  $('streakV').innerHTML = calcStreak() + '<small>日</small>';
+  renderSubjBreak();
   renderChart();
 }
 
@@ -455,6 +539,7 @@ $('fsBtn').onclick = () => {
 $('resetBtn').onclick = () => {
   if (!confirm('すべての再生記録をリセットしますか?')) return;
   days = {}; saveDays();
+  subjDays = {}; saveSubj();
   renderStats();
 };
 
@@ -466,6 +551,7 @@ document.querySelectorAll('#chartTabs .tab').forEach(t => {
   };
 });
 
+renderSubjBtns();
 renderStats();
 setupMediaHandlers();
 if (document.visibilityState !== 'hidden') startStatsLoop();
