@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="おうち在庫">
+<meta name="theme-color" content="#0d1117">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="../icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
+<title>おうち在庫 · 家族で共有する消耗品ストック</title>
+<style>
+:root{
+  --bg:#0d1117; --panel:#161b22; --panel2:#1c2330; --line:#2a3344;
+  --text:#e6edf3; --sub:#8b97a8; --accent:#3fb6ff; --accent-dim:rgba(63,182,255,.14);
+  --ok:#3fb950; --warn:#d29922; --err:#ff7b72;
+  --r:14px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;
+  min-height:100vh; padding-bottom:calc(96px + env(safe-area-inset-bottom));
+}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select,textarea{font-family:inherit;font-size:16px}
+
+header{
+  position:sticky;top:0;z-index:20;
+  background:rgba(13,17,23,.92); backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--line);
+  padding:calc(12px + env(safe-area-inset-top)) 14px 12px;
+  display:flex;align-items:center;gap:10px;
+}
+header h1{font-size:17px;font-weight:700;letter-spacing:.02em;flex:1}
+header h1 span{color:var(--accent)}
+.iconbtn{
+  width:38px;height:38px;border-radius:10px;border:1px solid var(--line);
+  background:var(--panel);display:flex;align-items:center;justify-content:center;font-size:18px;
+}
+#syncDot{font-size:11px;color:var(--sub);display:flex;align-items:center;gap:5px;
+  border:1px solid var(--line);border-radius:8px;padding:6px 9px;background:var(--panel);white-space:nowrap}
+#syncDot b{width:8px;height:8px;border-radius:50%;background:var(--sub);display:inline-block}
+#syncDot.on b{background:var(--ok)}
+#syncDot.err b{background:var(--err)}
+
+main{max-width:760px;margin:0 auto;padding:14px}
+
+.searchrow{display:flex;gap:8px;margin-bottom:10px}
+.searchrow input{
+  flex:1;background:var(--panel);border:1px solid var(--line);border-radius:12px;
+  color:var(--text);padding:12px 14px;outline:none;
+}
+.searchrow input::placeholder{color:var(--sub)}
+
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.controls select{
+  background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  color:var(--text);padding:9px 11px;outline:none;
+}
+.toggle{
+  display:flex;align-items:center;gap:7px;background:var(--panel);border:1px solid var(--line);
+  border-radius:10px;padding:9px 11px;font-size:13px;color:var(--sub);
+}
+.toggle.on{color:var(--warn);border-color:var(--warn)}
+
+.chips{display:flex;gap:7px;overflow-x:auto;padding-bottom:4px;margin-bottom:12px;-webkit-overflow-scrolling:touch}
+.chips::-webkit-scrollbar{display:none}
+.chip{
+  flex:0 0 auto;background:var(--panel);border:1px solid var(--line);border-radius:999px;
+  padding:8px 14px;font-size:13px;color:var(--sub);white-space:nowrap;
+}
+.chip.on{background:var(--accent-dim);border-color:var(--accent);color:var(--accent);font-weight:600}
+
+.stats{display:flex;gap:8px;margin-bottom:12px;font-size:12px;color:var(--sub);flex-wrap:wrap}
+.stats span{border:1px solid var(--line);border-radius:8px;padding:5px 9px}
+.stats b{color:var(--text)}
+.stats .alert{color:var(--warn);border-color:var(--warn)}
+
+.grouphead{font-size:13px;font-weight:700;color:var(--sub);margin:14px 2px 8px;letter-spacing:.03em}
+
+.card{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+  padding:12px;margin-bottom:10px;display:flex;gap:12px;align-items:flex-start;
+}
+.card.low{border-color:var(--warn);box-shadow:0 0 0 1px rgba(210,153,34,.25)}
+.thumb{
+  width:62px;height:62px;border-radius:10px;flex:0 0 auto;object-fit:cover;
+  background:var(--panel2);display:flex;align-items:center;justify-content:center;
+  font-size:26px;color:var(--sub);overflow:hidden;
+}
+.cbody{flex:1;min-width:0}
+.cname{font-size:16px;font-weight:700;line-height:1.3;word-break:break-word}
+.cmeta{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px}
+.tag{font-size:11px;color:var(--sub);background:var(--panel2);border-radius:6px;padding:3px 7px}
+.tag.loc::before{content:"📍 "}
+.tag.cat::before{content:"🏷 "}
+.tag.freq{color:var(--accent)}
+.cnote{font-size:12px;color:var(--sub);margin-top:6px;white-space:pre-wrap;word-break:break-word}
+
+.qtyrow{display:flex;align-items:center;gap:8px;margin-top:10px}
+.qbtn{
+  width:42px;height:42px;border-radius:11px;border:1px solid var(--line);background:var(--panel2);
+  font-size:24px;font-weight:700;display:flex;align-items:center;justify-content:center;color:var(--text);
+}
+.qbtn:active{transform:scale(.92)}
+.qbtn.minus{color:var(--err)}
+.qbtn.plus{color:var(--ok)}
+.qval{min-width:64px;text-align:center}
+.qval b{font-size:24px;font-weight:800}
+.qval small{color:var(--sub);font-size:12px;margin-left:2px}
+.usebtn{
+  margin-left:auto;border:1px solid var(--accent);color:var(--accent);background:var(--accent-dim);
+  border-radius:11px;padding:0 14px;height:42px;font-size:13px;font-weight:700;white-space:nowrap;
+}
+.usebtn:active{transform:scale(.95)}
+.editbtn{align-self:flex-start;color:var(--sub);font-size:20px;padding:4px 6px}
+
+.empty{text-align:center;color:var(--sub);padding:60px 20px;line-height:1.8}
+.empty .big{font-size:46px;margin-bottom:10px}
+
+/* Floating add button */
+.fab{
+  position:fixed;right:18px;bottom:calc(20px + env(safe-area-inset-bottom));z-index:30;
+  width:60px;height:60px;border-radius:50%;background:var(--accent);color:#06121c;
+  font-size:34px;display:flex;align-items:center;justify-content:center;
+  box-shadow:0 8px 26px rgba(0,0,0,.5);
+}
+.fab:active{transform:scale(.92)}
+
+/* Modal */
+.overlay{
+  position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.55);
+  display:none;align-items:flex-end;justify-content:center;
+}
+.overlay.show{display:flex}
+.sheet{
+  width:100%;max-width:760px;max-height:92vh;overflow-y:auto;
+  background:var(--panel);border-radius:20px 20px 0 0;border:1px solid var(--line);
+  padding:18px 16px calc(26px + env(safe-area-inset-bottom));
+  animation:up .22s ease;
+}
+@keyframes up{from{transform:translateY(40px);opacity:.5}to{transform:translateY(0);opacity:1}}
+.sheet h2{font-size:18px;margin-bottom:4px}
+.sheet .sub{font-size:12px;color:var(--sub);margin-bottom:16px;line-height:1.6}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:13px;color:var(--sub);margin-bottom:6px;font-weight:600}
+.field input[type=text],.field input[type=number],.field textarea,.field select{
+  width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:11px;
+  color:var(--text);padding:12px 13px;outline:none;
+}
+.field textarea{resize:vertical;min-height:64px}
+.field .hint{font-size:11px;color:var(--sub);margin-top:5px;line-height:1.5}
+.row2{display:flex;gap:10px}
+.row2>*{flex:1}
+
+.photopick{display:flex;gap:12px;align-items:center}
+.photoprev{
+  width:84px;height:84px;border-radius:12px;background:var(--panel2);border:1px dashed var(--line);
+  display:flex;align-items:center;justify-content:center;font-size:30px;color:var(--sub);
+  object-fit:cover;overflow:hidden;flex:0 0 auto;
+}
+.photoprev img{width:100%;height:100%;object-fit:cover}
+.photobtns{display:flex;flex-direction:column;gap:8px;flex:1}
+.btn-sm{border:1px solid var(--line);background:var(--panel2);border-radius:10px;padding:11px;font-size:14px;text-align:center}
+
+.btnrow{display:flex;gap:10px;margin-top:18px}
+.btn{flex:1;border-radius:12px;padding:14px;font-size:15px;font-weight:700;text-align:center}
+.btn-primary{background:var(--accent);color:#06121c}
+.btn-ghost{background:var(--panel2);border:1px solid var(--line);color:var(--text)}
+.btn-danger{background:transparent;border:1px solid var(--err);color:var(--err)}
+
+datalist{display:none}
+.suggrow{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+.sugg{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:5px 11px;color:var(--sub);background:var(--panel2)}
+.sugg.on{color:var(--accent);border-color:var(--accent)}
+
+.divider{height:1px;background:var(--line);margin:18px 0}
+.codebox{
+  width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:11px;
+  color:var(--text);padding:12px;font-family:ui-monospace,Menlo,monospace;font-size:12px;
+  min-height:120px;outline:none;resize:vertical;
+}
+.steps{font-size:12.5px;color:var(--sub);line-height:1.85;padding-left:2px}
+.steps a{color:var(--accent)}
+.steps ol{padding-left:20px;margin-top:6px}
+
+.toast{
+  position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom));transform:translateX(-50%);
+  background:var(--panel2);border:1px solid var(--line);color:var(--text);
+  padding:11px 18px;border-radius:999px;font-size:13px;z-index:60;opacity:0;pointer-events:none;
+  transition:opacity .2s, transform .2s; white-space:nowrap;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(-6px)}
+</style>
+</head>
+<body>
+<header>
+  <h1>おうち<span>在庫</span></h1>
+  <div id="syncDot" title="同期の状態"><b></b><span id="syncTxt">この端末のみ</span></div>
+  <button class="iconbtn" id="settingsBtn" aria-label="設定">⚙️</button>
+</header>
+
+<main>
+  <div class="searchrow">
+    <input id="search" type="search" placeholder="🔍 名前・場所・種類でさがす" autocomplete="off">
+  </div>
+
+  <div class="controls">
+    <select id="sortSel" aria-label="並び替え">
+      <option value="updated">最近さわった順</option>
+      <option value="freq">よく使う順</option>
+      <option value="name">名前順（あいうえお/ABC）</option>
+      <option value="qtyAsc">在庫が少ない順</option>
+      <option value="qtyDesc">在庫が多い順</option>
+      <option value="created">追加した順</option>
+    </select>
+    <select id="groupSel" aria-label="分類">
+      <option value="none">分類なし</option>
+      <option value="location">場所別にまとめる</option>
+      <option value="category">種類別にまとめる</option>
+    </select>
+    <button class="toggle" id="lowToggle">⚠️ 残りわずか</button>
+  </div>
+
+  <div class="chips" id="filterChips"></div>
+
+  <div class="stats" id="stats"></div>
+
+  <div id="list"></div>
+</main>
+
+<button class="fab" id="addBtn" aria-label="追加">＋</button>
+
+<!-- 追加・編集シート -->
+<div class="overlay" id="editOverlay">
+  <div class="sheet">
+    <h2 id="editTitle">アイテムを追加</h2>
+    <div class="sub">写真と名前を入れて保存。あとから個数を増やしたり減らしたりできます。</div>
+
+    <div class="field">
+      <label>写真</label>
+      <div class="photopick">
+        <div class="photoprev" id="photoPrev">📷</div>
+        <div class="photobtns">
+          <button class="btn-sm" id="cameraBtn">📸 カメラで撮る</button>
+          <button class="btn-sm" id="galleryBtn">🖼 写真をえらぶ</button>
+          <button class="btn-sm" id="photoClear" style="display:none">✕ 写真を消す</button>
+        </div>
+      </div>
+      <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
+      <input type="file" id="galleryInput" accept="image/*" hidden>
+    </div>
+
+    <div class="field">
+      <label>名前 <span style="color:var(--err)">*</span></label>
+      <input type="text" id="fName" placeholder="例）ティッシュペーパー" autocomplete="off">
+    </div>
+
+    <div class="row2">
+      <div class="field">
+        <label>今ある数</label>
+        <input type="number" id="fQty" value="1" min="0" inputmode="numeric">
+      </div>
+      <div class="field">
+        <label>単位</label>
+        <input type="text" id="fUnit" placeholder="個・本・箱…" list="unitList" autocomplete="off">
+        <datalist id="unitList">
+          <option value="個"><option value="本"><option value="箱"><option value="袋">
+          <option value="パック"><option value="ロール"><option value="缶"><option value="セット">
+        </datalist>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>置き場所</label>
+      <input type="text" id="fLoc" placeholder="例）洗面所の棚" list="locList" autocomplete="off">
+      <datalist id="locList"></datalist>
+      <div class="suggrow" id="locSugg"></div>
+    </div>
+
+    <div class="field">
+      <label>種類・カテゴリ</label>
+      <input type="text" id="fCat" placeholder="例）日用品・食品・薬…" list="catList" autocomplete="off">
+      <datalist id="catList"></datalist>
+      <div class="suggrow" id="catSugg"></div>
+    </div>
+
+    <div class="field">
+      <label>残りわずかの目安（この数以下で警告）</label>
+      <input type="number" id="fThreshold" value="1" min="0" inputmode="numeric">
+    </div>
+
+    <div class="field">
+      <label>メモ</label>
+      <textarea id="fNote" placeholder="買う店・型番・好みなど"></textarea>
+    </div>
+
+    <div class="btnrow">
+      <button class="btn btn-ghost" id="editCancel">キャンセル</button>
+      <button class="btn btn-primary" id="editSave">保存</button>
+    </div>
+    <div class="btnrow" id="deleteRow" style="display:none">
+      <button class="btn btn-danger" id="editDelete">このアイテムを削除</button>
+    </div>
+  </div>
+</div>
+
+<!-- 設定シート -->
+<div class="overlay" id="settingsOverlay">
+  <div class="sheet">
+    <h2>設定</h2>
+    <div class="sub">データは自動でこの端末に保存されます。家族と共有したいときは下のクラウド同期を設定してください。</div>
+
+    <h2 style="font-size:15px">☁️ 家族で共有（クラウド同期）</h2>
+    <div class="steps">
+      家族みんなで同じデータを見て、何年でも編集できるようにします。無料のFirebaseを使います。
+      <ol>
+        <li><a href="https://console.firebase.google.com/" target="_blank" rel="noopener">Firebaseコンソール</a>で新しいプロジェクトを作成</li>
+        <li>「Firestore Database」を作成（本番/テストどちらでも可）</li>
+        <li>プロジェクト設定 → マイアプリ →「ウェブ(&lt;/&gt;)」を追加</li>
+        <li>表示される <code>firebaseConfig</code> の中身を下に貼り付け</li>
+      </ol>
+    </div>
+
+    <div class="field" style="margin-top:14px">
+      <label>Firebase 設定（firebaseConfig を貼り付け）</label>
+      <textarea class="codebox" id="fbConfig" placeholder='{
+  "apiKey": "...",
+  "authDomain": "...",
+  "projectId": "...",
+  ...
+}'></textarea>
+      <div class="hint">{ } の中身ごと、または apiKey: "..." の形のまま貼ってOK。</div>
+    </div>
+
+    <div class="field">
+      <label>家族の合言葉（共有する人みんなで同じ言葉に）</label>
+      <input type="text" id="fbRoom" placeholder="例）yamada-family" autocomplete="off">
+      <div class="hint">同じ合言葉を入れた人どうしで在庫データを共有します。</div>
+    </div>
+
+    <div class="btnrow">
+      <button class="btn btn-ghost" id="syncOff">同期をやめる</button>
+      <button class="btn btn-primary" id="syncSave">共有を開始</button>
+    </div>
+
+    <div class="divider"></div>
+
+    <h2 style="font-size:15px">💾 バックアップ</h2>
+    <div class="sub" style="margin-bottom:10px">クラウドを使わなくても、ファイルとして保存・復元できます。</div>
+    <div class="btnrow" style="margin-top:0">
+      <button class="btn btn-ghost" id="exportBtn">書き出し</button>
+      <button class="btn btn-ghost" id="importBtn">読み込み</button>
+    </div>
+    <input type="file" id="importInput" accept="application/json,.json" hidden>
+
+    <div class="btnrow">
+      <button class="btn btn-ghost" id="settingsClose">閉じる</button>
+    </div>
+    <div class="hint" style="text-align:center;margin-top:14px;color:var(--sub)">
+      <a href="../index.html" style="color:var(--sub)">← FocusTube に戻る</a>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   おうち在庫 — 家族で共有する消耗品ストック管理
+   - データは localStorage に常時保存（オフラインでも動く）
+   - 設定で Firebase を入れると、家族みんなで同じデータをリアルタイム共有
+   - 写真は端末側で縮小して保存（無料枠でおさまるよう軽量化）
+   ============================================================ */
+(function(){
+'use strict';
+
+const LS_ITEMS = 'ouchi_inventory_items_v1';
+const LS_SYNC  = 'ouchi_inventory_sync_v1';
+const $ = s => document.querySelector(s);
+
+let items = [];            // 現在のアイテム配列
+let editingId = null;      // 編集中のID（新規はnull）
+let pendingPhoto = null;   // シート内で選んだ写真(dataURL)
+let activeFilter = { type:null, value:null }; // チップによる絞り込み
+let lowOnly = false;
+
+/* ---------- ストレージ ---------- */
+function loadLocal(){
+  try{ items = JSON.parse(localStorage.getItem(LS_ITEMS)) || []; }
+  catch{ items = []; }
+}
+function saveLocal(){
+  localStorage.setItem(LS_ITEMS, JSON.stringify(items));
+}
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+/* ---------- トースト ---------- */
+let toastTimer=null;
+function toast(msg){
+  const t=$('#toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),1900);
+}
+
+/* ============================================================
+   クラウド同期（Firebase Firestore / compat SDK）
+   ============================================================ */
+const Cloud = {
+  enabled:false, db:null, room:null, unsub:null, ready:false,
+  loadSDK(){
+    if(window.firebase && window.firebase.firestore) return Promise.resolve();
+    return new Promise((res,rej)=>{
+      const a=document.createElement('script');
+      a.src='https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js';
+      a.onload=()=>{
+        const b=document.createElement('script');
+        b.src='https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js';
+        b.onload=res; b.onerror=rej; document.head.appendChild(b);
+      };
+      a.onerror=rej; document.head.appendChild(a);
+    });
+  },
+  async start(cfg, room){
+    await this.loadSDK();
+    if(!window.firebase.apps.length) window.firebase.initializeApp(cfg);
+    this.db = window.firebase.firestore();
+    try{ await this.db.enablePersistence({synchronizeTabs:true}); }catch(e){/* 複数タブ等は無視 */}
+    this.room = room; this.enabled = true;
+    this.listen();
+    setSyncUI('on','共有中: '+room);
+  },
+  col(){ return this.db.collection('families').doc(this.room).collection('items'); },
+  listen(){
+    if(this.unsub) this.unsub();
+    this.unsub = this.col().onSnapshot(snap=>{
+      this.ready=true;
+      const remote=[];
+      snap.forEach(d=>remote.push(d.data()));
+      // クラウドを正とする（削除も反映）
+      items = remote.filter(x=>!x._deleted);
+      saveLocal();
+      render();
+    }, err=>{
+      console.error(err); setSyncUI('err','同期エラー');
+      toast('同期エラー: '+(err.code||err.message||''));
+    });
+  },
+  async put(item){
+    if(!this.enabled) return;
+    try{ await this.col().doc(item.id).set(item); }
+    catch(e){ console.error(e); toast('保存エラー'); }
+  },
+  async remove(id){
+    if(!this.enabled) return;
+    try{ await this.col().doc(id).delete(); }
+    catch(e){ console.error(e); }
+  },
+  async uploadAll(list){
+    if(!this.enabled) return;
+    const batch=this.db.batch();
+    list.forEach(it=>batch.set(this.col().doc(it.id), it, {merge:true}));
+    await batch.commit();
+  },
+  stop(){
+    if(this.unsub){ this.unsub(); this.unsub=null; }
+    this.enabled=false; this.db=null; this.room=null;
+    setSyncUI('off','この端末のみ');
+  }
+};
+
+function setSyncUI(state,txt){
+  const d=$('#syncDot'); d.classList.remove('on','err');
+  if(state==='on') d.classList.add('on');
+  if(state==='err') d.classList.add('err');
+  $('#syncTxt').textContent=txt;
+}
+
+/* firebaseConfig の貼り付けを寛容にパース（JSON / JS両対応） */
+function parseConfig(raw){
+  raw = raw.trim();
+  if(!raw) return null;
+  // firebaseConfig = {...} の代入部分を除去
+  const m = raw.match(/\{[\s\S]*\}/);
+  if(m) raw = m[0];
+  try{ return JSON.parse(raw); }catch{}
+  // キーをクォートし、末尾カンマ・コメントを除去してリトライ
+  try{
+    let s = raw
+      .replace(/\/\/.*$/gm,'')
+      .replace(/([{,]\s*)([A-Za-z0-9_]+)\s*:/g,'$1"$2":')
+      .replace(/'/g,'"')
+      .replace(/,(\s*[}\]])/g,'$1');
+    return JSON.parse(s);
+  }catch(e){ return null; }
+}
+
+async function tryAutoSync(){
+  let saved=null;
+  try{ saved=JSON.parse(localStorage.getItem(LS_SYNC)); }catch{}
+  if(saved && saved.config && saved.room){
+    $('#fbConfig').value = JSON.stringify(saved.config,null,2);
+    $('#fbRoom').value = saved.room;
+    setSyncUI('off','接続中…');
+    try{ await Cloud.start(saved.config, saved.room); }
+    catch(e){ console.error(e); setSyncUI('err','接続失敗'); toast('クラウド接続に失敗しました'); }
+  }
+}
+
+/* ============================================================
+   写真：端末側で縮小して dataURL 化（軽量・無料枠向け）
+   ============================================================ */
+function compressImage(file, maxSize=720, quality=0.7){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>{
+      const img=new Image();
+      img.onload=()=>{
+        let {width:w,height:h}=img;
+        if(w>h && w>maxSize){ h=Math.round(h*maxSize/w); w=maxSize; }
+        else if(h>=w && h>maxSize){ w=Math.round(w*maxSize/h); h=maxSize; }
+        const c=document.createElement('canvas'); c.width=w; c.height=h;
+        c.getContext('2d').drawImage(img,0,0,w,h);
+        resolve(c.toDataURL('image/jpeg',quality));
+      };
+      img.onerror=reject; img.src=reader.result;
+    };
+    reader.onerror=reject; reader.readAsDataURL(file);
+  });
+}
+
+/* ============================================================
+   描画
+   ============================================================ */
+function uniqueValues(key){
+  const set=new Set();
+  items.forEach(it=>{ if(it[key]) set.add(it[key]); });
+  return [...set].sort((a,b)=>a.localeCompare(b,'ja'));
+}
+
+function isLow(it){ return Number(it.qty) <= Number(it.threshold ?? 1); }
+
+function applySort(arr){
+  const v=$('#sortSel').value;
+  const c=[...arr];
+  if(v==='name') c.sort((a,b)=>(a.name||'').localeCompare(b.name||'','ja'));
+  else if(v==='freq') c.sort((a,b)=>(b.useCount||0)-(a.useCount||0) || (b.updatedAt||0)-(a.updatedAt||0));
+  else if(v==='qtyAsc') c.sort((a,b)=>(a.qty||0)-(b.qty||0));
+  else if(v==='qtyDesc') c.sort((a,b)=>(b.qty||0)-(a.qty||0));
+  else if(v==='created') c.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  else c.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0)); // updated
+  return c;
+}
+
+function renderChips(){
+  const wrap=$('#filterChips'); wrap.innerHTML='';
+  const groupBy=$('#groupSel').value;
+  let key=null;
+  if(activeFilter.type) key=activeFilter.type;
+  else if(groupBy==='location') key='location';
+  else if(groupBy==='category') key='category';
+  else key='category'; // デフォルトは種類で絞り込みチップ
+  const vals=uniqueValues(key);
+  if(!vals.length){ wrap.style.display='none'; return; }
+  wrap.style.display='flex';
+  const all=document.createElement('button');
+  all.className='chip'+(!activeFilter.value?' on':'');
+  all.textContent='すべて';
+  all.onclick=()=>{ activeFilter={type:null,value:null}; render(); };
+  wrap.appendChild(all);
+  vals.forEach(v=>{
+    const b=document.createElement('button');
+    b.className='chip'+(activeFilter.value===v&&activeFilter.type===key?' on':'');
+    b.textContent=(key==='location'?'📍 ':'🏷 ')+v;
+    b.onclick=()=>{ activeFilter={type:key,value:v}; render(); };
+    wrap.appendChild(b);
+  });
+}
+
+function getFiltered(){
+  const q=$('#search').value.trim().toLowerCase();
+  return items.filter(it=>{
+    if(lowOnly && !isLow(it)) return false;
+    if(activeFilter.value && it[activeFilter.type]!==activeFilter.value) return false;
+    if(q){
+      const hay=[it.name,it.location,it.category,it.note].join(' ').toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function render(){
+  renderChips();
+  const list=$('#list'); list.innerHTML='';
+  let data=getFiltered();
+  data=applySort(data);
+
+  // 統計
+  const lowCount=items.filter(isLow).length;
+  const stats=$('#stats');
+  stats.innerHTML=
+    `<span>全 <b>${items.length}</b> 種</span>`+
+    (lowCount?`<span class="alert">⚠️ 残りわずか <b>${lowCount}</b></span>`:'')+
+    (activeFilter.value?`<span>絞り込み中: <b>${activeFilter.value}</b></span>`:'');
+
+  if(!data.length){
+    list.innerHTML=`<div class="empty"><div class="big">📦</div>`+
+      (items.length? '条件に合うものがありません。' : 'まだ何も登録されていません。<br>右下の ＋ から消耗品を追加しましょう。')+
+      `</div>`;
+    return;
+  }
+
+  const groupBy=$('#groupSel').value;
+  if(groupBy==='none'){
+    data.forEach(it=>list.appendChild(card(it)));
+  }else{
+    const key=groupBy;
+    const groups={};
+    data.forEach(it=>{ const g=it[key]||'（未分類）'; (groups[g]=groups[g]||[]).push(it); });
+    Object.keys(groups).sort((a,b)=>a.localeCompare(b,'ja')).forEach(g=>{
+      const h=document.createElement('div'); h.className='grouphead';
+      h.textContent=(key==='location'?'📍 ':'🏷 ')+g+`（${groups[g].length}）`;
+      list.appendChild(h);
+      groups[g].forEach(it=>list.appendChild(card(it)));
+    });
+  }
+}
+
+function card(it){
+  const el=document.createElement('div');
+  el.className='card'+(isLow(it)?' low':'');
+  const thumb = it.photo
+    ? `<div class="thumb"><img src="${it.photo}" alt=""></div>`
+    : `<div class="thumb">📦</div>`;
+  const tags=[];
+  if(it.location) tags.push(`<span class="tag loc">${esc(it.location)}</span>`);
+  if(it.category) tags.push(`<span class="tag cat">${esc(it.category)}</span>`);
+  if(it.useCount) tags.push(`<span class="tag freq">よく使う×${it.useCount}</span>`);
+  el.innerHTML=`
+    ${thumb}
+    <div class="cbody">
+      <div class="cname">${esc(it.name)}</div>
+      <div class="cmeta">${tags.join('')}</div>
+      ${it.note?`<div class="cnote">${esc(it.note)}</div>`:''}
+      <div class="qtyrow">
+        <button class="qbtn minus" aria-label="減らす">－</button>
+        <div class="qval"><b>${it.qty}</b><small>${esc(it.unit||'')}</small></div>
+        <button class="qbtn plus" aria-label="増やす">＋</button>
+        <button class="usebtn">使った −1</button>
+      </div>
+    </div>
+    <button class="editbtn" aria-label="編集">✏️</button>`;
+  el.querySelector('.minus').onclick=()=>changeQty(it.id,-1,false);
+  el.querySelector('.plus').onclick =()=>changeQty(it.id,+1,false);
+  el.querySelector('.usebtn').onclick=()=>changeQty(it.id,-1,true);
+  el.querySelector('.editbtn').onclick=()=>openEdit(it.id);
+  return el;
+}
+
+function esc(s){ return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* 個数の増減（used=true のときは使用回数も増やす＝頻度に反映） */
+function changeQty(id,delta,used){
+  const it=items.find(x=>x.id===id); if(!it) return;
+  it.qty=Math.max(0, Number(it.qty||0)+delta);
+  if(used) it.useCount=(it.useCount||0)+1;
+  it.updatedAt=Date.now();
+  saveLocal(); render(); Cloud.put(it);
+}
+
+/* ============================================================
+   追加・編集シート
+   ============================================================ */
+function openEdit(id){
+  editingId=id; pendingPhoto=null;
+  const it = id ? items.find(x=>x.id===id) : null;
+  $('#editTitle').textContent = id?'アイテムを編集':'アイテムを追加';
+  $('#fName').value = it?it.name:'';
+  $('#fQty').value  = it?it.qty:1;
+  $('#fUnit').value = it?(it.unit||''):'';
+  $('#fLoc').value  = it?(it.location||''):'';
+  $('#fCat').value  = it?(it.category||''):'';
+  $('#fThreshold').value = it?(it.threshold??1):1;
+  $('#fNote').value = it?(it.note||''):'';
+  setPhotoPrev(it?it.photo:null);
+  $('#deleteRow').style.display = id?'flex':'none';
+  buildSuggestions();
+  $('#editOverlay').classList.add('show');
+}
+function closeEdit(){ $('#editOverlay').classList.remove('show'); }
+
+function setPhotoPrev(dataUrl){
+  const p=$('#photoPrev');
+  if(dataUrl){ p.innerHTML=`<img src="${dataUrl}" alt="">`; $('#photoClear').style.display='block'; }
+  else{ p.innerHTML='📷'; $('#photoClear').style.display='none'; }
+}
+
+function buildSuggestions(){
+  const locs=uniqueValues('location'), cats=uniqueValues('category');
+  $('#locList').innerHTML=locs.map(v=>`<option value="${esc(v)}">`).join('');
+  $('#catList').innerHTML=cats.map(v=>`<option value="${esc(v)}">`).join('');
+  fillSugg('#locSugg','#fLoc',locs);
+  fillSugg('#catSugg','#fCat',cats);
+}
+function fillSugg(wrapSel,inputSel,vals){
+  const wrap=$(wrapSel); wrap.innerHTML='';
+  vals.slice(0,8).forEach(v=>{
+    const b=document.createElement('button'); b.type='button'; b.className='sugg'; b.textContent=v;
+    b.onclick=()=>{ $(inputSel).value=v; };
+    wrap.appendChild(b);
+  });
+}
+
+function saveEdit(){
+  const name=$('#fName').value.trim();
+  if(!name){ toast('名前を入れてください'); $('#fName').focus(); return; }
+  const data={
+    name,
+    qty:Math.max(0,Number($('#fQty').value||0)),
+    unit:$('#fUnit').value.trim(),
+    location:$('#fLoc').value.trim(),
+    category:$('#fCat').value.trim(),
+    threshold:Math.max(0,Number($('#fThreshold').value||0)),
+    note:$('#fNote').value.trim(),
+    updatedAt:Date.now(),
+  };
+  let it;
+  if(editingId){
+    it=items.find(x=>x.id===editingId);
+    Object.assign(it,data);
+    if(pendingPhoto!==null) it.photo=pendingPhoto;
+  }else{
+    it={ id:uid(), createdAt:Date.now(), useCount:0, photo:pendingPhoto||'', ...data };
+    items.push(it);
+  }
+  saveLocal(); render(); Cloud.put(it); closeEdit();
+  toast(editingId?'保存しました':'追加しました');
+}
+
+function deleteItem(){
+  if(!editingId) return;
+  if(!confirm('このアイテムを削除しますか？')) return;
+  const id=editingId;
+  items=items.filter(x=>x.id!==id);
+  saveLocal(); render(); Cloud.remove(id); closeEdit();
+  toast('削除しました');
+}
+
+/* ============================================================
+   バックアップ（書き出し / 読み込み）
+   ============================================================ */
+function exportData(){
+  const blob=new Blob([JSON.stringify(items,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='ouchi-zaiko-'+new Date().toISOString().slice(0,10)+'.json';
+  a.click(); URL.revokeObjectURL(a.href);
+  toast('バックアップを書き出しました');
+}
+function importData(file){
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const arr=JSON.parse(r.result);
+      if(!Array.isArray(arr)) throw 0;
+      // IDで重複排除しつつマージ
+      const map=new Map(items.map(i=>[i.id,i]));
+      arr.forEach(i=>{ if(i&&i.id&&i.name) map.set(i.id,i); });
+      items=[...map.values()];
+      saveLocal(); render();
+      if(Cloud.enabled) Cloud.uploadAll(items);
+      toast('読み込みました（'+arr.length+'件）');
+    }catch{ toast('ファイルを読み込めませんでした'); }
+  };
+  r.readAsText(file);
+}
+
+/* ============================================================
+   イベント結線
+   ============================================================ */
+function wire(){
+  $('#addBtn').onclick=()=>openEdit(null);
+  $('#editCancel').onclick=closeEdit;
+  $('#editSave').onclick=saveEdit;
+  $('#editDelete').onclick=deleteItem;
+  $('#editOverlay').onclick=e=>{ if(e.target.id==='editOverlay') closeEdit(); };
+
+  $('#cameraBtn').onclick=()=>$('#cameraInput').click();
+  $('#galleryBtn').onclick=()=>$('#galleryInput').click();
+  $('#photoClear').onclick=()=>{ pendingPhoto=''; setPhotoPrev(null); };
+  const onPhoto=async e=>{
+    const f=e.target.files&&e.target.files[0]; if(!f) return;
+    toast('写真を処理中…');
+    try{ pendingPhoto=await compressImage(f); setPhotoPrev(pendingPhoto); }
+    catch{ toast('写真を読み込めませんでした'); }
+    e.target.value='';
+  };
+  $('#cameraInput').onchange=onPhoto;
+  $('#galleryInput').onchange=onPhoto;
+
+  $('#search').oninput=render;
+  $('#sortSel').onchange=render;
+  $('#groupSel').onchange=()=>{ activeFilter={type:null,value:null}; render(); };
+  $('#lowToggle').onclick=()=>{
+    lowOnly=!lowOnly; $('#lowToggle').classList.toggle('on',lowOnly); render();
+  };
+
+  // 設定
+  $('#settingsBtn').onclick=()=>$('#settingsOverlay').classList.add('show');
+  $('#settingsClose').onclick=()=>$('#settingsOverlay').classList.remove('show');
+  $('#settingsOverlay').onclick=e=>{ if(e.target.id==='settingsOverlay') e.currentTarget.classList.remove('show'); };
+  $('#syncSave').onclick=startSync;
+  $('#syncOff').onclick=()=>{
+    localStorage.removeItem(LS_SYNC); Cloud.stop(); toast('同期をやめました');
+  };
+  $('#exportBtn').onclick=exportData;
+  $('#importBtn').onclick=()=>$('#importInput').click();
+  $('#importInput').onchange=e=>{ const f=e.target.files[0]; if(f) importData(f); e.target.value=''; };
+}
+
+async function startSync(){
+  const cfg=parseConfig($('#fbConfig').value);
+  const room=$('#fbRoom').value.trim().toLowerCase().replace(/\s+/g,'-');
+  if(!cfg||!cfg.projectId){ toast('Firebase設定が正しくありません'); return; }
+  if(!room){ toast('家族の合言葉を入れてください'); $('#fbRoom').focus(); return; }
+  setSyncUI('off','接続中…');
+  try{
+    await Cloud.start(cfg,room);
+    localStorage.setItem(LS_SYNC, JSON.stringify({config:cfg,room}));
+    // この端末のデータをクラウドへ送る（初回共有用）
+    if(items.length){
+      if(confirm('この端末の '+items.length+' 件をクラウドへアップロードしますか？\n（家族と共有を始めます）')){
+        await Cloud.uploadAll(items);
+      }
+    }
+    $('#settingsOverlay').classList.remove('show');
+    toast('共有を開始しました');
+  }catch(e){
+    console.error(e); setSyncUI('err','接続失敗');
+    toast('接続に失敗しました。設定を確認してください');
+  }
+}
+
+/* ---------- 起動 ---------- */
+loadLocal();
+wire();
+render();
+tryAutoSync();
+
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('./sw.js').catch(()=>{});
+}
+})();
+</script>
+</body>
+</html>
