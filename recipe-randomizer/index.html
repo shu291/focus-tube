@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>きょうの献立ルーレット 🍳</title>
+  <meta name="description" content="献立を考えるのが面倒なときに。難易度を選んでルーレットを回すと、ジャンル・主食・食材・調理法が決まり、Gemini AIが具体的なレシピを提案します。" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+
+    <!-- ===== ヘッダー ===== -->
+    <header class="site-header">
+      <h1>🍳 きょうの献立ルーレット</h1>
+      <p class="tagline">「何作ろう…」をルーレットで解決！</p>
+      <button id="settingsBtn" class="settings-btn" title="設定" aria-label="設定">⚙️</button>
+    </header>
+
+    <!-- ===== 画面1：スタート ===== -->
+    <section id="screen-start" class="screen active">
+      <div class="card">
+        <h2>1. 何人分つくる？</h2>
+        <div class="people-row">
+          <button class="step-btn" id="peopleMinus" aria-label="減らす">−</button>
+          <div class="people-value"><span id="peopleCount">2</span><small>人分</small></div>
+          <button class="step-btn" id="peoplePlus" aria-label="増やす">＋</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>2. きょうの気分は？</h2>
+        <p class="sub">難易度を選んでね</p>
+        <div class="difficulty-grid">
+          <button class="diff-card" data-diff="easy">
+            <span class="emoji">😋</span>
+            <span class="diff-title">簡単</span>
+            <span class="diff-desc">パパッと時短ごはん</span>
+          </button>
+          <button class="diff-card" data-diff="normal">
+            <span class="emoji">🍽️</span>
+            <span class="diff-title">普通</span>
+            <span class="diff-desc">定番のおうちごはん</span>
+          </button>
+          <button class="diff-card" data-diff="hard">
+            <span class="emoji">👨‍🍳</span>
+            <span class="diff-title">凝った料理</span>
+            <span class="diff-desc">休日にじっくり本格派</span>
+          </button>
+        </div>
+      </div>
+
+      <button id="toRouletteBtn" class="primary-btn" disabled>ルーレットへ進む →</button>
+    </section>
+
+    <!-- ===== 画面2：ルーレット ===== -->
+    <section id="screen-roulette" class="screen">
+      <div class="recap" id="recap"></div>
+
+      <div class="reels" id="reels">
+        <div class="reel" data-key="genre">
+          <div class="reel-label">ジャンル</div>
+          <div class="reel-window"><div class="reel-strip"><span class="reel-item">？</span></div></div>
+        </div>
+        <div class="reel" data-key="staple">
+          <div class="reel-label">主食</div>
+          <div class="reel-window"><div class="reel-strip"><span class="reel-item">？</span></div></div>
+        </div>
+        <div class="reel" data-key="ingredient">
+          <div class="reel-label">メイン食材</div>
+          <div class="reel-window"><div class="reel-strip"><span class="reel-item">？</span></div></div>
+        </div>
+        <div class="reel" data-key="method">
+          <div class="reel-label">調理法</div>
+          <div class="reel-window"><div class="reel-strip"><span class="reel-item">？</span></div></div>
+        </div>
+      </div>
+
+      <div class="roulette-actions">
+        <button id="spinBtn" class="primary-btn">🎰 4つ一斉に回す！</button>
+        <button id="toRecipeBtn" class="primary-btn alt" disabled>このメニューでレシピを見る →</button>
+        <button id="backToStartBtn" class="ghost-btn">← 難易度を選び直す</button>
+      </div>
+    </section>
+
+    <!-- ===== 画面3：レシピ ===== -->
+    <section id="screen-recipe" class="screen">
+      <div class="recap" id="recipeRecap"></div>
+      <div id="recipeArea" class="recipe-area"></div>
+      <div class="roulette-actions">
+        <button id="reSpinBtn" class="primary-btn alt">🎰 もう一回まわす</button>
+        <button id="homeBtn" class="ghost-btn">🏠 最初から</button>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ===== 設定モーダル ===== -->
+  <div id="settingsModal" class="modal-overlay">
+    <div class="modal">
+      <h2>⚙️ 設定</h2>
+      <label class="field-label" for="apiKeyInput">Gemini API キー</label>
+      <p class="field-help">
+        入力すると AI が具体的なレシピを提案します。キーは <strong>あなたの端末内だけ</strong> に保存され、外部に送信されません(Google API への通信を除く)。<br>
+        <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">→ 無料の API キーを取得する (Google AI Studio)</a>
+      </p>
+      <input type="password" id="apiKeyInput" placeholder="AIza..." autocomplete="off" />
+      <p class="field-help">未設定でも、Google検索・クックパッド等のリンクで料理を探せます。</p>
+      <div class="modal-actions">
+        <button id="saveSettingsBtn" class="primary-btn">保存</button>
+        <button id="closeSettingsBtn" class="ghost-btn">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <p>ルーレットで献立を決めて、毎日のごはんをちょっと楽しく 🍽️</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
