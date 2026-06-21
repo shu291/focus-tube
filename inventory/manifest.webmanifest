@@ -1,0 +1,17 @@
+{
+  "name": "おうち在庫",
+  "short_name": "おうち在庫",
+  "description": "家族で共有する家庭の消耗品ストック管理。写真と文字で登録し、個数を増減、場所や種類で分類、よく使う順に並べ替え。クラウド同期で家族みんなが同じデータを編集できます。",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d1117",
+  "theme_color": "#0d1117",
+  "icons": [
+    { "src": "../icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "../icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "../icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "../icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
