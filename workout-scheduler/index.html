@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="筋トレ割り当て" />
+<meta name="theme-color" content="#0d1117" />
+<meta name="description" content="その日・その週の筋トレメニューを、科学的な回復日数(48〜72時間)を考慮してランダムに自動生成。やった部位・種目はカレンダーで一覧できます。" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" href="../icon.svg" type="image/svg+xml" />
+<link rel="apple-touch-icon" href="../apple-touch-icon.png" />
+<title>筋トレ割り当てルーレット 🏋️</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="app">
+
+  <header class="site-header">
+    <div class="title-row">
+      <h1>🏋️ 筋トレ割り当て</h1>
+      <span class="streak" id="streakBadge" title="連続記録">🔥 <b id="streakNum">0</b></span>
+    </div>
+    <p class="tagline">回復日数を考えて、きょう・今週のメニューを自動で割り当て</p>
+  </header>
+
+  <!-- ===== タブ ===== -->
+  <nav class="tabbar" id="tabbar">
+    <button class="tab active" data-tab="today">きょう</button>
+    <button class="tab" data-tab="week">1週間</button>
+    <button class="tab" data-tab="calendar">カレンダー</button>
+  </nav>
+
+  <!-- ===== きょう ===== -->
+  <section id="tab-today" class="tabview active">
+    <div class="card">
+      <h2>各部位の回復ぐあい</h2>
+      <p class="sub">最後にやってから何時間あいたか。バーが満タン＝しっかり回復＝今日やるのにベスト。</p>
+      <div id="readinessList" class="readiness-list"></div>
+    </div>
+
+    <button id="genTodayBtn" class="primary-btn">🎲 今日のメニューを割り当てる</button>
+
+    <div id="todayResult" class="result hidden"></div>
+  </section>
+
+  <!-- ===== 1週間 ===== -->
+  <section id="tab-week" class="tabview">
+    <div class="card">
+      <h2>週に何日やる？</h2>
+      <p class="sub">日数に合わせて、同じ部位が連続しないよう48〜72時間の休養を空けて自動で組みます。</p>
+      <div class="freq-grid" id="freqGrid">
+        <button class="freq-btn" data-days="3">週3日<small>全身×3</small></button>
+        <button class="freq-btn active" data-days="4">週4日<small>上半身/下半身</small></button>
+        <button class="freq-btn" data-days="5">週5日<small>PPL+α</small></button>
+        <button class="freq-btn" data-days="6">週6日<small>PPL×2</small></button>
+      </div>
+    </div>
+
+    <button id="genWeekBtn" class="primary-btn">🗓️ 今週のスケジュールを割り当てる</button>
+
+    <div id="weekResult" class="result hidden"></div>
+  </section>
+
+  <!-- ===== カレンダー ===== -->
+  <section id="tab-calendar" class="tabview">
+    <div class="card cal-card">
+      <div class="cal-head">
+        <button id="prevMonth" class="ghost-btn">‹</button>
+        <h2 id="calTitle">2026年6月</h2>
+        <button id="nextMonth" class="ghost-btn">›</button>
+      </div>
+      <div class="cal-weekdays">
+        <span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span class="sat">土</span><span class="sun">日</span>
+      </div>
+      <div id="calGrid" class="cal-grid"></div>
+      <div id="calLegend" class="legend"></div>
+    </div>
+
+    <div id="dayDetail" class="card hidden"></div>
+
+    <div class="card">
+      <h2>これまでの合計</h2>
+      <div id="statList" class="stat-list"></div>
+      <button id="exportBtn" class="ghost-btn small">⬇︎ 記録をJSONで書き出す</button>
+    </div>
+  </section>
+
+</div>
+
+<footer class="site-footer">
+  <p>データはこの端末のブラウザに保存されます（外部送信なし）。</p>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
