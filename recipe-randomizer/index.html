@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>きょうの献立ルーレット 🍳</title>
-  <meta name="description" content="献立を考えるのが面倒なときに。難易度を選んでルーレットを回すと、ジャンル・主食・食材・調理法が決まり、Gemini AIが具体的なレシピを提案します。" />
+  <meta name="description" content="献立を考えるのが面倒なときに。難易度を選んでルーレットを回すと、ジャンル・主食・食材・調理法が決まり、その組み合わせで作れる料理をすぐ検索できます。" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -14,7 +14,6 @@
     <header class="site-header">
       <h1>🍳 きょうの献立ルーレット</h1>
       <p class="tagline">「何作ろう…」をルーレットで解決！</p>
-      <button id="settingsBtn" class="settings-btn" title="設定" aria-label="設定">⚙️</button>
     </header>
 
     <!-- ===== 画面1：スタート ===== -->
@@ -93,24 +92,6 @@
       </div>
     </section>
 
-  </div>
-
-  <!-- ===== 設定モーダル ===== -->
-  <div id="settingsModal" class="modal-overlay">
-    <div class="modal">
-      <h2>⚙️ 設定</h2>
-      <label class="field-label" for="apiKeyInput">Gemini API キー</label>
-      <p class="field-help">
-        入力すると AI が具体的なレシピを提案します。キーは <strong>あなたの端末内だけ</strong> に保存され、外部に送信されません(Google API への通信を除く)。<br>
-        <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">→ 無料の API キーを取得する (Google AI Studio)</a>
-      </p>
-      <input type="password" id="apiKeyInput" placeholder="AIza..." autocomplete="off" />
-      <p class="field-help">未設定でも、Google検索・クックパッド等のリンクで料理を探せます。</p>
-      <div class="modal-actions">
-        <button id="saveSettingsBtn" class="primary-btn">保存</button>
-        <button id="closeSettingsBtn" class="ghost-btn">閉じる</button>
-      </div>
-    </div>
   </div>
 
   <footer class="site-footer">

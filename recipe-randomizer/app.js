@@ -2,7 +2,7 @@
 
 /* =========================================================
  * きょうの献立ルーレット
- * 難易度 → 4つのルーレット → Gemini API で具体的なレシピ生成
+ * 難易度 → 4つのルーレット → 決まった組み合わせで料理を検索
  * ========================================================= */
 
 // 難易度ごとのルーレット候補
@@ -34,7 +34,6 @@ const DATA = {
 };
 
 const REEL_KEYS = ["genre", "staple", "ingredient", "method"];
-const REEL_JP = { genre: "ジャンル", staple: "主食", ingredient: "メイン食材", method: "調理法" };
 
 const state = {
   people: 2,
@@ -168,135 +167,36 @@ function initRoulette() {
 }
 
 /* =========================================================
- * 画面3：レシピ（Gemini API or 検索リンク）
+ * 画面3：レシピ（検索リンク）
  * ========================================================= */
 function resultSummary() {
   const r = state.result;
   return `${r.genre} / ${r.staple} / ${r.ingredient} / ${r.method}`;
 }
 
-function getApiKey() {
-  return (localStorage.getItem("gemini_api_key") || "").trim();
-}
-
-async function loadRecipe() {
+function loadRecipe() {
   const d = DATA[state.difficulty];
-  const r = state.result;
   $("#recipeRecap").textContent = `${d.label}・${state.people}人分 — ${resultSummary()}`;
   const area = $("#recipeArea");
-
-  const key = getApiKey();
-  if (!key) {
-    renderSearchFallback(area, "AIレシピを使うには ⚙️ 設定で Gemini APIキーを登録してください。");
-    return;
-  }
-
-  area.innerHTML = `<div class="loading"><div class="spinner"></div>AIがレシピを考えています…</div>`;
-
-  try {
-    const recipe = await fetchGeminiRecipe(key, d, r, state.people);
-    renderRecipe(area, recipe);
-  } catch (err) {
-    console.error(err);
-    renderSearchFallback(
-      area,
-      "AIレシピの取得に失敗しました（APIキーや通信をご確認ください）。代わりに検索で探せます。"
-    );
-  }
-}
-
-async function fetchGeminiRecipe(apiKey, d, r, people) {
-  const prompt = `あなたはプロの料理研究家です。以下の条件に合う家庭料理を1品、日本語で考えてください。
-
-# 条件
-- ジャンル: ${r.genre}
-- 主食/ベース: ${r.staple}
-- メイン食材: ${r.ingredient}
-- 主な調理法: ${r.method}
-- 難易度: ${d.label}
-- 人数: ${people}人分
-
-# 出力（必ず次のJSON形式のみ。説明文やマークダウンは付けない）
-{
-  "title": "料理名",
-  "description": "一言の紹介（30文字程度）",
-  "time": "調理時間の目安（例: 約25分）",
-  "ingredients": ["材料 分量（${people}人分）", "..."],
-  "steps": ["手順1", "手順2", "..."],
-  "tip": "おいしく作るコツを1つ"
-}`;
-
-  const model = "gemini-2.0-flash";
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
-
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 1.0, responseMimeType: "application/json" },
-    }),
-  });
-
-  if (!res.ok) {
-    const t = await res.text();
-    throw new Error("Gemini API error: " + res.status + " " + t);
-  }
-  const json = await res.json();
-  const text = json?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-  return JSON.parse(text);
-}
-
-function renderRecipe(area, recipe) {
-  const ingredients = (recipe.ingredients || []).map((i) => `<li>${escapeHtml(i)}</li>`).join("");
-  const steps = (recipe.steps || []).map((s) => `<li>${escapeHtml(s)}</li>`).join("");
-  const tip = recipe.tip ? `<div class="recipe-tip">💡 <strong>コツ：</strong>${escapeHtml(recipe.tip)}</div>` : "";
-
   area.innerHTML = `
-    <div class="recipe-card">
-      <h3>${escapeHtml(recipe.title || "おすすめ料理")}</h3>
-      <div class="recipe-meta">${escapeHtml(recipe.description || "")}${recipe.time ? " ・ ⏱ " + escapeHtml(recipe.time) : ""} ・ 👥 ${state.people}人分</div>
-      <h4>🛒 材料</h4>
-      <ul>${ingredients}</ul>
-      <h4>👩‍🍳 作り方</h4>
-      <ol>${steps}</ol>
-      ${tip}
-    </div>
-    ${searchLinksHtml(recipe.title)}
+    <p class="notice">この組み合わせで作れる料理を探そう！</p>
+    ${searchLinksHtml()}
   `;
 }
 
-function renderSearchFallback(area, message) {
-  area.innerHTML = `
-    <p class="notice">${escapeHtml(message)}</p>
-    ${searchLinksHtml(null)}
-  `;
-}
-
-function searchLinksHtml(dishTitle) {
+function searchLinksHtml() {
   const d = DATA[state.difficulty];
   const r = state.result;
-  const base = dishTitle
-    ? dishTitle
-    : `${r.genre} ${r.ingredient} ${r.staple} ${r.method} ${d.keyword} レシピ`;
+  const base = `${r.genre} ${r.ingredient} ${r.staple} ${r.method} ${d.keyword} レシピ`;
   const q = encodeURIComponent(base.replace(/\(.*?\)/g, "").trim());
   return `
     <h4 style="color:var(--accent-dark);text-align:center;margin:18px 0 8px;">🔎 レシピを探す</h4>
     <div class="search-links">
       <a href="https://www.google.com/search?q=${q}" target="_blank" rel="noopener">Googleで検索</a>
-      <a href="https://cookpad.com/search/${q}" target="_blank" rel="noopener">クックパッドで探す</a>
       <a href="https://recipe.rakuten.co.jp/search/${q}/" target="_blank" rel="noopener">楽天レシピで探す</a>
       <a href="https://www.youtube.com/results?search_query=${q}" target="_blank" rel="noopener">YouTubeで作り方動画を見る</a>
     </div>
   `;
-}
-
-function escapeHtml(str) {
-  return String(str)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }
 
 function initRecipe() {
@@ -307,28 +207,7 @@ function initRecipe() {
   $("#homeBtn").addEventListener("click", () => showScreen("screen-start"));
 }
 
-/* =========================================================
- * 設定モーダル
- * ========================================================= */
-function initSettings() {
-  const modal = $("#settingsModal");
-  const input = $("#apiKeyInput");
-  $("#settingsBtn").addEventListener("click", () => {
-    input.value = getApiKey();
-    modal.classList.add("open");
-  });
-  $("#closeSettingsBtn").addEventListener("click", () => modal.classList.remove("open"));
-  $("#saveSettingsBtn").addEventListener("click", () => {
-    localStorage.setItem("gemini_api_key", input.value.trim());
-    modal.classList.remove("open");
-  });
-  modal.addEventListener("click", (e) => {
-    if (e.target === modal) modal.classList.remove("open");
-  });
-}
-
 /* ---------- 起動 ---------- */
 initStart();
 initRoulette();
 initRecipe();
-initSettings();
