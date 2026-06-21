@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<title>ミニ単語帳メーカー</title>
+<style>
+:root{
+  --bg:#0d1117; --panel:#161b22; --panel2:#1c2330; --line:#2a3344;
+  --text:#e6edf3; --sub:#8b97a8; --accent:#3fb6ff; --accent-dim:rgba(63,182,255,.14);
+  --ok:#3fb950; --warn:#d29922; --err:#ff7b72;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;
+  min-height:100vh; padding-bottom:env(safe-area-inset-bottom);
+  line-height:1.5;
+}
+header{
+  position:sticky;top:0;z-index:10;
+  background:rgba(13,17,23,.92); backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--line);
+  padding:calc(12px + env(safe-area-inset-top)) 16px 12px;
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+}
+header h1{font-size:17px;font-weight:700;letter-spacing:.02em}
+header h1 span{color:var(--accent)}
+.wrap{max-width:760px;margin:0 auto;padding:16px;}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:16px}
+.card h2{font-size:14px;color:var(--sub);font-weight:700;margin-bottom:12px;letter-spacing:.04em;text-transform:uppercase}
+
+label{display:block;font-size:13px;color:var(--sub);margin-bottom:6px}
+input[type=text],input[type=number],textarea,select{
+  width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+  color:var(--text);padding:10px 12px;font-size:15px;font-family:inherit;
+}
+textarea{min-height:160px;resize:vertical;line-height:1.6}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.field{margin-bottom:12px}
+.field:last-child{margin-bottom:0}
+
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  background:var(--accent);color:#06121c;border:none;border-radius:10px;
+  padding:12px 18px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;
+}
+.btn.sec{background:var(--panel2);color:var(--text);border:1px solid var(--line)}
+.btn:active{transform:scale(.98)}
+.btnrow{display:flex;gap:10px;flex-wrap:wrap}
+
+.rowlist{display:flex;flex-direction:column;gap:8px}
+.entry{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center}
+.entry input{padding:8px 10px;font-size:14px}
+.entry .del{background:none;border:1px solid var(--line);color:var(--err);border-radius:8px;
+  width:34px;height:34px;cursor:pointer;font-size:16px;flex:none}
+.hint{font-size:12px;color:var(--sub);margin-top:6px}
+.count{font-size:12px;color:var(--sub)}
+
+.seg{display:flex;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:3px;gap:3px}
+.seg button{flex:1;background:none;border:none;color:var(--sub);padding:8px;border-radius:8px;
+  font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+.seg button.on{background:var(--accent);color:#06121c}
+
+/* ---------- 印刷プレビュー ---------- */
+#sheets{margin-top:8px}
+.sheet{
+  background:#fff;color:#111;margin:0 auto 20px;
+  box-shadow:0 4px 24px rgba(0,0,0,.4);
+  display:grid;
+}
+.sheet .lbl{grid-column:1/-1;font-size:11px;color:#888;padding:2px 4px;border-bottom:1px dashed #ccc}
+.tcard{
+  border:1px dashed #b9b9b9;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;text-align:center;
+  padding:6px;overflow:hidden;break-inside:avoid;
+}
+.tcard .w{font-weight:700;word-break:break-word}
+.tcard .en{color:#444;word-break:break-word}
+.tcard .ja{color:#111;word-break:break-word}
+.tcard .note{color:#777;font-size:.8em;word-break:break-word}
+.tcard .num{position:absolute}
+.foldcard{display:grid;grid-template-columns:1fr 1fr;border:1px dashed #b9b9b9;break-inside:avoid}
+.foldcard>div{padding:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;overflow:hidden}
+.foldcard .front{border-right:1px dashed #ccc}
+
+@media (max-width:520px){ .grid3{grid-template-columns:1fr 1fr} .entry{grid-template-columns:1fr 1fr auto} }
+
+@media print{
+  body{background:#fff}
+  header,.wrap > .card,.noprint{display:none !important}
+  .wrap{max-width:none;padding:0;margin:0}
+  #sheets{margin:0}
+  .sheet{box-shadow:none;margin:0;page-break-after:always}
+  .sheet .lbl{display:none}
+  .tcard,.foldcard{border-color:#ccc}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>ミニ<span>単語帳</span>メーカー</h1>
+  <button class="btn sec noprint" id="printBtn">🖨 印刷</button>
+</header>
+
+<div class="wrap">
+
+  <!-- 入力 -->
+  <div class="card noprint">
+    <h2>① 単語を入れる</h2>
+
+    <div class="seg" id="inputMode" style="margin-bottom:12px">
+      <button data-m="list" class="on">1つずつ入力</button>
+      <button data-m="bulk">まとめて貼り付け</button>
+    </div>
+
+    <div id="listMode">
+      <div class="rowlist" id="entries"></div>
+      <div class="btnrow" style="margin-top:10px">
+        <button class="btn sec" id="addRow">＋ 行を追加</button>
+        <span class="count" id="rowCount"></span>
+      </div>
+    </div>
+
+    <div id="bulkMode" style="display:none">
+      <label>1行に1単語。区切りは <b>タブ / カンマ</b>。例：<br>
+        <code>apple , りんご</code> または <code>apple &nbsp; りんご &nbsp; 果物</code>（3列目はメモ）
+      </label>
+      <textarea id="bulkText" placeholder="apple, りんご&#10;run, 走る&#10;beautiful, 美しい"></textarea>
+      <div class="btnrow" style="margin-top:10px">
+        <button class="btn sec" id="loadBulk">この内容を読み込む</button>
+        <button class="btn sec" id="sampleBtn">サンプルを入れる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 設定 -->
+  <div class="card noprint">
+    <h2>② サイズ・レイアウト</h2>
+
+    <div class="grid2">
+      <div class="field">
+        <label>用紙サイズ</label>
+        <select id="paper">
+          <option value="A4">A4（210×297mm）</option>
+          <option value="A5">A5（148×210mm）</option>
+          <option value="A6">A6（105×148mm）</option>
+          <option value="B5">B5（182×257mm）</option>
+          <option value="B6">B6（128×182mm）</option>
+          <option value="L">L判（89×127mm）</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>向き</label>
+        <div class="seg" id="orient">
+          <button data-o="portrait" class="on">たて</button>
+          <button data-o="landscape">よこ</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>カードの作り方</label>
+      <div class="seg" id="layoutMode">
+        <button data-l="cut" class="on">切って使う（片面）</button>
+        <button data-l="fold">2つ折り</button>
+        <button data-l="duplex">両面印刷</button>
+      </div>
+      <div class="hint" id="layoutHint"></div>
+    </div>
+
+    <div class="grid3">
+      <div class="field">
+        <label>横の枚数（列）</label>
+        <input type="number" id="cols" value="3" min="1" max="10">
+      </div>
+      <div class="field">
+        <label>縦の枚数（行）</label>
+        <input type="number" id="rows" value="6" min="1" max="20">
+      </div>
+      <div class="field">
+        <label>余白(mm)</label>
+        <input type="number" id="margin" value="8" min="0" max="40">
+      </div>
+    </div>
+
+    <div class="grid3">
+      <div class="field">
+        <label>カード間の隙間(mm)</label>
+        <input type="number" id="gap" value="2" min="0" max="20">
+      </div>
+      <div class="field">
+        <label>文字サイズ(pt)</label>
+        <input type="number" id="font" value="11" min="5" max="40">
+      </div>
+      <div class="field">
+        <label>番号をつける</label>
+        <div class="seg" id="numToggle">
+          <button data-n="0" class="on">なし</button>
+          <button data-n="1">あり</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>カードに表示する内容</label>
+      <div class="grid3">
+        <label style="color:var(--text)"><input type="checkbox" id="showWord" checked> 単語(英)</label>
+        <label style="color:var(--text)"><input type="checkbox" id="showJa" checked> 日本語訳</label>
+        <label style="color:var(--text)"><input type="checkbox" id="showNote"> メモ</label>
+      </div>
+      <div class="hint">「切って使う / 2つ折り」のときの表示項目です。両面印刷は 表=単語 / 裏=日本語訳 になります。</div>
+    </div>
+  </div>
+
+  <div class="card noprint">
+    <h2>③ プレビュー & 印刷</h2>
+    <div class="btnrow">
+      <button class="btn" id="genBtn">プレビューを作る</button>
+      <button class="btn sec" id="printBtn2">🖨 印刷する</button>
+    </div>
+    <div class="hint">印刷ダイアログで用紙サイズを上の設定と合わせ、余白「なし / 最小」にすると綺麗に出ます。両面印刷は「長辺とじ」を選んでください。</div>
+  </div>
+
+  <div id="sheets"></div>
+</div>
+
+<script>
+/* ---------------- データ ---------------- */
+const PAPER_MM = {A4:[210,297],A5:[148,210],A6:[105,148],B5:[182,257],B6:[128,182],L:[89,127]};
+const state = {
+  mode:'list', orient:'portrait', layout:'cut', num:0,
+};
+const entriesEl = document.getElementById('entries');
+
+function blankRow(w='',j='',n=''){
+  const div=document.createElement('div');
+  div.className='entry';
+  div.innerHTML=`
+    <input type="text" class="w" placeholder="単語 (英語)" value="${esc(w)}">
+    <input type="text" class="j" placeholder="日本語訳" value="${esc(j)}">
+    <button class="del" title="削除">×</button>`;
+  // hidden note carried on dataset
+  div.dataset.note = n || '';
+  div.querySelector('.del').onclick=()=>{div.remove();refreshCount();};
+  return div;
+}
+function esc(s){return String(s).replace(/"/g,'&quot;').replace(/</g,'&lt;');}
+
+function addRow(w,j,n){ entriesEl.appendChild(blankRow(w,j,n)); refreshCount(); }
+function refreshCount(){
+  document.getElementById('rowCount').textContent = entriesEl.children.length + ' 語';
+}
+
+/* 初期行 */
+for(let i=0;i<4;i++) addRow();
+
+document.getElementById('addRow').onclick=()=>addRow();
+
+/* ---------------- 入力モード切替 ---------------- */
+document.querySelectorAll('#inputMode button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#inputMode button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); state.mode=b.dataset.m;
+  document.getElementById('listMode').style.display = state.mode==='list'?'':'none';
+  document.getElementById('bulkMode').style.display = state.mode==='bulk'?'':'none';
+});
+
+/* セグメント汎用 */
+function seg(id,key,cb){
+  document.querySelectorAll('#'+id+' button').forEach(b=>b.onclick=()=>{
+    document.querySelectorAll('#'+id+' button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); state[key]=b.dataset[Object.keys(b.dataset)[0]]; cb&&cb();
+  });
+}
+seg('orient','orient');
+seg('layoutMode','layout',updateLayoutHint);
+seg('numToggle','num');
+
+function updateLayoutHint(){
+  const h=document.getElementById('layoutHint');
+  const t={
+    cut:'グリッドに並べて印刷 → 線で切ればミニカードの完成。',
+    fold:'1枚に「単語｜訳」を並べて印刷 → まん中で折ると表に単語・裏に訳。',
+    duplex:'表ページ(単語)と裏ページ(訳)を作成。プリンタの両面印刷でカード化。'
+  };
+  h.textContent=t[state.layout]||'';
+}
+updateLayoutHint();
+
+/* ---------------- 一括読み込み ---------------- */
+document.getElementById('loadBulk').onclick=()=>{
+  const lines=document.getElementById('bulkText').value.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  if(!lines.length){alert('テキストが空です');return;}
+  entriesEl.innerHTML='';
+  lines.forEach(l=>{
+    const parts=l.split(/\t|,/).map(s=>s.trim());
+    addRow(parts[0]||'',parts[1]||'',parts[2]||'');
+  });
+  // switch to list view so user can confirm
+  document.querySelector('#inputMode button[data-m="list"]').click();
+};
+document.getElementById('sampleBtn').onclick=()=>{
+  document.getElementById('bulkText').value=
+`apple, りんご, 果物
+run, 走る
+beautiful, 美しい
+difficult, 難しい
+remember, 思い出す/覚える
+although, ～だけれども
+improve, 改善する
+schedule, 予定/スケジュール`;
+};
+
+/* ---------------- 収集 ---------------- */
+function collect(){
+  if(state.mode==='bulk' && document.getElementById('bulkText').value.trim()){
+    document.getElementById('loadBulk').click();
+  }
+  const out=[];
+  [...entriesEl.children].forEach(div=>{
+    const w=div.querySelector('.w').value.trim();
+    const j=div.querySelector('.j').value.trim();
+    const n=(div.dataset.note||'').trim();
+    if(w||j) out.push({w,j,n});
+  });
+  return out;
+}
+
+/* ---------------- 生成 ---------------- */
+function num(id){return parseFloat(document.getElementById(id).value)||0;}
+
+function generate(){
+  const data=collect();
+  if(!data.length){alert('単語を1つ以上入力してください');return;}
+
+  const [pw0,ph0]=PAPER_MM[document.getElementById('paper').value];
+  const land=state.orient==='landscape';
+  const pw=land?ph0:pw0, ph=land?pw0:ph0;
+  const cols=Math.max(1,num('cols')), rows=Math.max(1,num('rows'));
+  const mg=num('margin'), gap=num('gap'), font=num('font');
+  const showWord=document.getElementById('showWord').checked;
+  const showJa=document.getElementById('showJa').checked;
+  const showNote=document.getElementById('showNote').checked;
+  const withNum=state.num==='1';
+
+  const sheets=document.getElementById('sheets');
+  sheets.innerHTML='';
+
+  const perPage=cols*rows;
+  const innerW=pw-mg*2, innerH=ph-mg*2;
+
+  function makeSheet(label){
+    const s=document.createElement('div');
+    s.className='sheet';
+    s.style.width=pw+'mm'; s.style.height=ph+'mm';
+    s.style.padding=mg+'mm';
+    s.style.gridTemplateColumns=`repeat(${cols},1fr)`;
+    s.style.gridTemplateRows=`repeat(${rows},1fr)`;
+    s.style.gap=gap+'mm';
+    s.style.fontSize=font+'pt';
+    if(label){const l=document.createElement('div');l.className='lbl';l.textContent=label;s.appendChild(l);}
+    sheets.appendChild(s);
+    return s;
+  }
+
+  function cell(item,idx,sideText){
+    const c=document.createElement('div');
+    c.className='tcard';
+    c.style.position='relative';
+    let html='';
+    if(withNum) html+=`<div class="num" style="top:3px;left:5px;font-size:.65em;color:#aaa">${idx+1}</div>`;
+    if(sideText!==undefined){
+      html+=`<div class="${sideText.cls}" style="font-size:${sideText.big?1.15:1}em">${esc(sideText.t)}</div>`;
+    }else{
+      if(showWord&&item.w) html+=`<div class="w">${esc(item.w)}</div>`;
+      if(showJa&&item.j) html+=`<div class="ja">${esc(item.j)}</div>`;
+      if(showNote&&item.n) html+=`<div class="note">${esc(item.n)}</div>`;
+    }
+    c.innerHTML=html;
+    return c;
+  }
+
+  if(state.layout==='cut'){
+    for(let p=0;p*perPage<data.length;p++){
+      const s=makeSheet('切り取り用 ページ '+(p+1));
+      for(let i=0;i<perPage;i++){
+        const idx=p*perPage+i;
+        if(idx>=data.length) break;
+        s.appendChild(cell(data[idx],idx));
+      }
+    }
+  }
+  else if(state.layout==='fold'){
+    // each grid cell is a fold-card (front=word | back=ja)
+    for(let p=0;p*perPage<data.length;p++){
+      const s=makeSheet('2つ折り用 ページ '+(p+1));
+      s.style.fontSize=font+'pt';
+      for(let i=0;i<perPage;i++){
+        const idx=p*perPage+i;
+        if(idx>=data.length) break;
+        const it=data[idx];
+        const fc=document.createElement('div');
+        fc.className='foldcard';
+        fc.style.position='relative';
+        const front=showWord?esc(it.w):'';
+        let backHtml='';
+        if(showJa&&it.j) backHtml+=`<div class="ja">${esc(it.j)}</div>`;
+        if(showNote&&it.n) backHtml+=`<div class="note">${esc(it.n)}</div>`;
+        fc.innerHTML=`<div class="front"><div class="w">${front}</div>${withNum?`<div style="position:absolute;top:2px;left:4px;font-size:.6em;color:#aaa">${idx+1}</div>`:''}</div>
+                      <div class="back">${backHtml}</div>`;
+        s.appendChild(fc);
+      }
+    }
+  }
+  else { // duplex
+    for(let p=0;p*perPage<data.length;p++){
+      // front page: words
+      const sf=makeSheet('表（単語）ページ '+(p+1));
+      for(let i=0;i<perPage;i++){
+        const idx=p*perPage+i;
+        if(idx>=data.length){ sf.appendChild(document.createElement('div')); continue;}
+        sf.appendChild(cell(data[idx],idx,{t:data[idx].w,cls:'w',big:true}));
+      }
+      // back page: translations, columns reversed for long-edge duplex alignment
+      const sb=makeSheet('裏（日本語訳）ページ '+(p+1));
+      for(let r=0;r<rows;r++){
+        for(let c=cols-1;c>=0;c--){
+          const i=r*cols+c;
+          const idx=p*perPage+i;
+          if(idx>=data.length){ sb.appendChild(document.createElement('div')); continue;}
+          const it=data[idx];
+          let t=it.j||''; if(showNote&&it.n) t+= (t?' / ':'')+it.n;
+          sb.appendChild(cell(it,idx,{t:t,cls:'ja',big:false}));
+        }
+      }
+    }
+  }
+  sheets.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+document.getElementById('genBtn').onclick=generate;
+document.getElementById('printBtn').onclick=()=>{ if(!document.getElementById('sheets').children.length) generate(); setTimeout(()=>window.print(),100); };
+document.getElementById('printBtn2').onclick=document.getElementById('printBtn').onclick;
+</script>
+</body>
+</html>
