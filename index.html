@@ -74,11 +74,10 @@ header .badge{font-size:12px;color:var(--sub);border:1px solid var(--line);borde
 .subjList .row:first-of-type{margin-top:0}
 .subjList .nm{font-size:13px;width:50px;min-width:50px;color:var(--text)}
 .subjList .barwrap{flex:1;background:var(--panel2);border-radius:6px;height:9px;overflow:hidden}
-.subjList .barwrap .b{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#2b7fb8);border-radius:6px;transition:width .3s}
+.subjList .barwrap .b{display:block;height:100%;border-radius:6px;transition:width .3s}
 .subjList .tm{font-size:12px;color:var(--sub);min-width:64px;text-align:right;font-variant-numeric:tabular-nums}
 .subjList .tm small{margin:0 1px}
 .subjList .empty{font-size:12.5px;color:var(--sub)}
-#subjTotal .barwrap .b{background:linear-gradient(90deg,var(--warn),#a06f10)}
 
 #stats{margin-top:14px;display:flex;gap:10px}
 #stats .stat{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 10px;text-align:center}
@@ -387,7 +386,7 @@ function renderSubjRows(wrapId, sd, label){
   const max = Math.max(...rows.map(r => r.sec));
   wrap.innerHTML = '<div class="lbl">'+label+'</div>' + rows.map(r =>
     '<div class="row"><span class="nm">'+r.name+'</span>'+
-    '<span class="barwrap"><span class="b" style="width:'+Math.max(6, Math.round(r.sec/max*100))+'%"></span></span>'+
+    '<span class="barwrap"><span class="b" style="width:'+Math.max(6, Math.round(r.sec/max*100))+'%;background:'+subjColor(r.name)+'"></span></span>'+
     '<span class="tm">'+fmt(r.sec)+'</span></div>').join('');
 }
 function renderSubjBreak(){
