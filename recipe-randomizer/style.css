@@ -39,19 +39,6 @@ body {
   letter-spacing: 0.02em;
 }
 .tagline { color: #b06a3a; font-size: 0.95rem; margin-top: 4px; }
-.settings-btn {
-  position: absolute;
-  top: 18px; right: 4px;
-  background: #fff;
-  border: none;
-  width: 44px; height: 44px;
-  border-radius: 50%;
-  font-size: 1.2rem;
-  cursor: pointer;
-  box-shadow: var(--shadow);
-  transition: transform 0.2s;
-}
-.settings-btn:hover { transform: rotate(45deg); }
 
 /* ===== 画面切り替え ===== */
 .screen { display: none; animation: fadeIn 0.35s ease; }
@@ -214,54 +201,6 @@ body {
 
 /* ===== レシピ ===== */
 .recipe-area { min-height: 120px; }
-.recipe-card {
-  background: #fff;
-  border-radius: 22px;
-  padding: 22px;
-  margin-bottom: 18px;
-  box-shadow: var(--shadow);
-}
-.recipe-card h3 {
-  font-size: 1.4rem;
-  color: var(--accent-dark);
-  margin-bottom: 4px;
-}
-.recipe-meta {
-  font-size: 0.85rem;
-  color: #a07a55;
-  margin-bottom: 14px;
-}
-.recipe-card h4 {
-  color: var(--accent-dark);
-  margin: 16px 0 6px;
-  border-bottom: 2px dashed #ffd8a8;
-  padding-bottom: 4px;
-}
-.recipe-card ul, .recipe-card ol { padding-left: 1.3em; }
-.recipe-card li { margin-bottom: 5px; }
-.recipe-tip {
-  background: #fff7e6;
-  border-radius: 12px;
-  padding: 12px;
-  margin-top: 14px;
-  font-size: 0.9rem;
-}
-
-.loading {
-  text-align: center;
-  padding: 40px 20px;
-  color: var(--accent-dark);
-  font-weight: bold;
-}
-.spinner {
-  width: 48px; height: 48px;
-  border: 5px solid #ffd8a8;
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  margin: 0 auto 16px;
-  animation: spin 0.8s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
 
 .search-links {
   display: grid;
@@ -286,40 +225,6 @@ body {
   text-align: center;
   margin-bottom: 12px;
 }
-
-/* ===== モーダル ===== */
-.modal-overlay {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(74,59,42,0.45);
-  z-index: 100;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-}
-.modal-overlay.open { display: flex; }
-.modal {
-  background: #fff;
-  border-radius: 22px;
-  padding: 24px;
-  max-width: 460px;
-  width: 100%;
-  box-shadow: var(--shadow);
-}
-.modal h2 { color: var(--accent-dark); margin-bottom: 12px; }
-.field-label { font-weight: bold; display: block; margin-bottom: 6px; }
-.field-help { font-size: 0.8rem; color: #a07a55; margin: 8px 0; }
-.field-help a { color: var(--accent-dark); }
-#apiKeyInput {
-  width: 100%;
-  padding: 12px;
-  border-radius: 12px;
-  border: 2px solid #ffd8a8;
-  font-size: 1rem;
-}
-.modal-actions { display: flex; gap: 10px; margin-top: 16px; }
-.modal-actions .primary-btn, .modal-actions .ghost-btn { margin-bottom: 0; }
 
 /* ===== フッター ===== */
 .site-footer {
