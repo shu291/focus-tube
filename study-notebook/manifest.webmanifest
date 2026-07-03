@@ -1,0 +1,17 @@
+{
+  "name": "参考書ノート",
+  "short_name": "参考書ノート",
+  "description": "参考書のページ・問題ごとに「どこで間違えたか」「次はどう解くか」を写真つきで記録し、1→3→7→14→30日の間隔で解き直しをうながす学習ノート。データは端末内に自動保存されます。",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d1117",
+  "theme_color": "#0d1117",
+  "icons": [
+    { "src": "../icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "../icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "../icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "../icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

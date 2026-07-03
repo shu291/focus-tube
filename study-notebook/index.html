@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="参考書ノート">
+<meta name="theme-color" content="#0d1117">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="../icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
+<title>参考書ノート · 間違い記録</title>
+<style>
+:root{
+  --bg:#0d1117; --panel:#161b22; --panel2:#1c2330; --line:#2a3344;
+  --text:#e6edf3; --sub:#8b97a8; --accent:#3fb6ff; --accent-dim:rgba(63,182,255,.14);
+  --ok:#3fb950; --warn:#d29922; --err:#ff7b72;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;
+  min-height:100vh; padding-bottom:calc(76px + env(safe-area-inset-bottom));
+}
+header{
+  position:sticky;top:0;z-index:10;
+  background:rgba(13,17,23,.92); backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--line);
+  padding:calc(12px + env(safe-area-inset-top)) 16px 12px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+header h1{font-size:17px;font-weight:700;letter-spacing:.02em}
+header h1 span{color:var(--accent)}
+header .badge{font-size:12px;color:var(--sub);border:1px solid var(--line);border-radius:8px;padding:5px 10px}
+
+main{max-width:680px;margin:0 auto;padding:14px 16px 24px}
+.view{display:none}
+.view.on{display:block}
+
+/* ---- 下タブ ---- */
+nav{
+  position:fixed;bottom:0;left:0;right:0;z-index:20;
+  background:rgba(13,17,23,.96);backdrop-filter:blur(12px);
+  border-top:1px solid var(--line);
+  display:flex;max-width:680px;margin:0 auto;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+nav button{
+  flex:1;background:none;border:none;color:var(--sub);cursor:pointer;
+  padding:9px 0 7px;font-size:10.5px;font-weight:600;
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+}
+nav button .ic{font-size:20px;line-height:1}
+nav button.on{color:var(--accent)}
+nav button .cnt{
+  position:absolute;transform:translate(14px,-4px);
+  background:var(--err);color:#fff;font-size:10px;font-weight:700;
+  min-width:16px;height:16px;border-radius:8px;padding:0 4px;
+  display:flex;align-items:center;justify-content:center;
+}
+
+/* ---- 共通部品 ---- */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:12px}
+.card .lbl{font-size:11px;color:var(--sub);letter-spacing:.04em;margin-bottom:10px}
+.field{margin-top:12px}
+.field:first-child{margin-top:0}
+.field label{display:block;font-size:12px;color:var(--sub);margin-bottom:6px;font-weight:600}
+input[type=text],input[type=number],input[type=search],textarea,select{
+  width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);
+  border-radius:10px;padding:11px 12px;font-size:15px;font-family:inherit;
+  -webkit-appearance:none;appearance:none;
+}
+textarea{min-height:76px;resize:vertical;line-height:1.6}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
+.row2{display:flex;gap:10px}
+.row2>*{flex:1;min-width:0}
+.btn{
+  background:var(--panel2);color:var(--text);border:1px solid var(--line);
+  border-radius:10px;padding:12px 14px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;
+}
+.btn:active{opacity:.75}
+.btn.primary{background:var(--accent);color:#06121c;border-color:var(--accent);font-weight:700}
+.btn.danger{color:var(--err);border-color:rgba(255,123,114,.4)}
+.btn.small{padding:7px 11px;font-size:12.5px;border-radius:8px}
+.btn.wfull{width:100%;margin-top:14px}
+.empty{font-size:13px;color:var(--sub);text-align:center;padding:26px 10px;line-height:1.8}
+
+/* ---- 記録フォーム ---- */
+.statusBtns{display:flex;gap:7px}
+.statusBtns button{
+  flex:1;background:var(--panel2);border:1px solid var(--line);color:var(--sub);
+  border-radius:10px;padding:10px 4px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;
+}
+.statusBtns button.on[data-v=again]{background:rgba(255,123,114,.13);border-color:var(--err);color:var(--err)}
+.statusBtns button.on[data-v=almost]{background:rgba(210,153,34,.13);border-color:var(--warn);color:var(--warn)}
+.statusBtns button.on[data-v=done]{background:rgba(63,185,80,.13);border-color:var(--ok);color:var(--ok)}
+#photoRow{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+#photoRow .ph{
+  position:relative;width:74px;height:74px;border-radius:10px;overflow:hidden;
+  border:1px solid var(--line);background:var(--panel2);
+}
+#photoRow .ph img{width:100%;height:100%;object-fit:cover;display:block}
+#photoRow .ph .rm{
+  position:absolute;top:2px;right:2px;width:22px;height:22px;border-radius:50%;
+  background:rgba(0,0,0,.65);color:#fff;border:none;font-size:12px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+}
+.photoBtns{display:flex;gap:8px}
+.photoBtns .btn{flex:1;font-size:13px}
+
+/* ---- 一覧カード ---- */
+.filters{display:flex;gap:8px;margin-top:12px}
+.filters select{flex:1;font-size:13px;padding:9px 10px}
+.entry{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 14px;margin-top:10px}
+.entry .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.entry .book{
+  font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:7px;
+  border:1px solid;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46%;
+}
+.entry .loc{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
+.entry .date{font-size:11px;color:var(--sub);margin-left:auto;white-space:nowrap}
+.chip{font-size:11px;font-weight:700;padding:3px 8px;border-radius:7px;white-space:nowrap}
+.chip.again{background:rgba(255,123,114,.13);color:var(--err)}
+.chip.almost{background:rgba(210,153,34,.13);color:var(--warn)}
+.chip.done{background:rgba(63,185,80,.13);color:var(--ok)}
+.entry .sec{margin-top:9px;font-size:13.5px;line-height:1.65;white-space:pre-wrap;word-break:break-word}
+.entry .sec .t{display:block;font-size:10.5px;color:var(--sub);font-weight:700;letter-spacing:.04em;margin-bottom:2px}
+.entry .sec.plan{background:var(--accent-dim);border-radius:9px;padding:8px 10px}
+.entry .sec.plan .t{color:var(--accent)}
+.entry .tags{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}
+.entry .tags span{font-size:11px;color:var(--sub);border:1px solid var(--line);border-radius:6px;padding:2px 7px}
+.entry .thumbs{display:flex;gap:7px;margin-top:10px;overflow-x:auto}
+.entry .thumbs img{
+  width:64px;height:64px;object-fit:cover;border-radius:9px;
+  border:1px solid var(--line);cursor:pointer;flex:0 0 auto;
+}
+.entry .acts{display:flex;gap:8px;margin-top:11px;align-items:center}
+.entry .acts .rv{font-size:11px;color:var(--sub);margin-left:auto}
+
+/* ---- 復習 ---- */
+.dueBanner{
+  margin-top:12px;background:var(--accent-dim);border:1px solid var(--accent);
+  border-radius:12px;padding:12px 14px;font-size:13.5px;line-height:1.6;
+}
+.dueBanner b{color:var(--accent)}
+.rvBtns{display:flex;gap:7px;margin-top:11px}
+.rvBtns button{
+  flex:1;border-radius:10px;padding:11px 4px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;
+  background:var(--panel2);border:1px solid var(--line);color:var(--text);
+}
+.rvBtns button.ng{color:var(--err);border-color:rgba(255,123,114,.4)}
+.rvBtns button.so{color:var(--warn);border-color:rgba(210,153,34,.4)}
+.rvBtns button.ok{color:var(--ok);border-color:rgba(63,185,80,.45)}
+.rvHint{font-size:11px;color:var(--sub);margin-top:8px}
+
+/* ---- 本棚 ---- */
+.bookCard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 14px;margin-top:10px}
+.bookCard .hd{display:flex;align-items:center;gap:9px}
+.bookCard .dot{width:11px;height:11px;border-radius:3px;flex:0 0 auto}
+.bookCard .nm{font-size:14.5px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bookCard .sj{font-size:11px;color:var(--sub);border:1px solid var(--line);border-radius:6px;padding:2px 7px;white-space:nowrap}
+.bookCard .st{display:flex;align-items:center;gap:10px;margin-top:10px}
+.bookCard .barwrap{flex:1;background:var(--panel2);border-radius:6px;height:9px;overflow:hidden}
+.bookCard .barwrap .b{display:block;height:100%;border-radius:6px;background:var(--ok);transition:width .3s}
+.bookCard .num{font-size:12px;color:var(--sub);white-space:nowrap;font-variant-numeric:tabular-nums}
+.bookCard .acts{display:flex;gap:8px;margin-top:10px}
+
+/* ---- 統計 ---- */
+#stats{margin-top:12px;display:flex;gap:10px}
+#stats .stat{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 8px;text-align:center}
+#stats .stat .k{font-size:11px;color:var(--sub)}
+#stats .stat .v{font-size:19px;font-weight:700;margin-top:5px;font-variant-numeric:tabular-nums}
+#stats .stat .v small{font-size:11px;color:var(--sub);font-weight:600;margin-left:1px}
+#stats .stat.a .v{color:var(--err)}
+#stats .stat.b .v{color:var(--warn)}
+#stats .stat.c .v{color:var(--ok)}
+
+/* ---- モーダル / ライトボックス ---- */
+#lightbox{
+  position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.92);
+  display:none;align-items:center;justify-content:center;padding:20px;
+}
+#lightbox.on{display:flex}
+#lightbox img{max-width:100%;max-height:100%;border-radius:8px}
+#toast{
+  position:fixed;left:50%;bottom:calc(86px + env(safe-area-inset-bottom));transform:translateX(-50%);
+  background:var(--panel2);border:1px solid var(--line);color:var(--text);
+  font-size:13px;font-weight:600;padding:10px 18px;border-radius:22px;z-index:60;
+  opacity:0;pointer-events:none;transition:opacity .25s;white-space:nowrap;
+  box-shadow:0 6px 24px rgba(0,0,0,.5);
+}
+#toast.on{opacity:1}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>参考書<span>ノート</span></h1>
+  <span class="badge" id="verBadge">間違い記録</span>
+</header>
+
+<main>
+
+  <!-- ============ 記録 ============ -->
+  <section class="view on" id="view-add">
+    <div class="card">
+      <div class="lbl">✍️ 間違えた問題を記録</div>
+
+      <div class="field">
+        <label>参考書</label>
+        <div class="row2">
+          <select id="fBook"></select>
+          <button class="btn small" id="fNewBook" style="flex:0 0 auto">＋ 新しい本</button>
+        </div>
+      </div>
+
+      <div class="field row2">
+        <div>
+          <label>ページ</label>
+          <input type="number" id="fPage" inputmode="numeric" placeholder="例: 42">
+        </div>
+        <div>
+          <label>問題番号</label>
+          <input type="text" id="fProblem" placeholder="例: 大問3(2)">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>どこで間違えた?(原因)</label>
+        <textarea id="fMistake" placeholder="例: 符号の処理ミス。移項するときに−を付け忘れた"></textarea>
+      </div>
+
+      <div class="field">
+        <label>次はどう解く?(対策)</label>
+        <textarea id="fPlan" placeholder="例: 移項したら必ず両辺を見直す。まず式を全部書き出す"></textarea>
+      </div>
+
+      <div class="field">
+        <label>単元・タグ(任意 / カンマ区切り)</label>
+        <input type="text" id="fTags" placeholder="例: 二次関数, 計算ミス">
+      </div>
+
+      <div class="field">
+        <label>写真(問題・自分の答案など)</label>
+        <div class="photoBtns">
+          <button class="btn" id="fCamBtn">📷 カメラで撮る</button>
+          <button class="btn" id="fLibBtn">🖼 写真から選ぶ</button>
+        </div>
+        <input type="file" id="fCam" accept="image/*" capture="environment" hidden>
+        <input type="file" id="fLib" accept="image/*" multiple hidden>
+        <div id="photoRow"></div>
+      </div>
+
+      <div class="field">
+        <label>いまの理解度</label>
+        <div class="statusBtns" id="fStatus">
+          <button data-v="again" class="on">✕ もう一度</button>
+          <button data-v="almost">△ あと少し</button>
+          <button data-v="done">⭕ できた</button>
+        </div>
+      </div>
+
+      <button class="btn primary wfull" id="fSave">保存する</button>
+      <button class="btn wfull" id="fCancel" style="display:none">編集をやめる</button>
+    </div>
+  </section>
+
+  <!-- ============ 一覧 ============ -->
+  <section class="view" id="view-list">
+    <input type="search" id="q" placeholder="🔍 キーワード検索(内容・タグ・ページ)" style="margin-top:12px">
+    <div class="filters">
+      <select id="fltBook"><option value="">すべての本</option></select>
+      <select id="fltStatus">
+        <option value="">すべての状態</option>
+        <option value="again">✕ もう一度</option>
+        <option value="almost">△ あと少し</option>
+        <option value="done">⭕ 克服した</option>
+      </select>
+    </div>
+    <div id="entryList"></div>
+  </section>
+
+  <!-- ============ 復習 ============ -->
+  <section class="view" id="view-review">
+    <div id="dueBanner" class="dueBanner"></div>
+    <div id="reviewList"></div>
+  </section>
+
+  <!-- ============ 本棚 ============ -->
+  <section class="view" id="view-books">
+    <div class="card">
+      <div class="lbl">📚 本を追加</div>
+      <div class="row2">
+        <input type="text" id="bTitle" placeholder="参考書の名前" style="flex:2">
+        <select id="bSubject" style="flex:1"></select>
+      </div>
+      <button class="btn primary wfull" id="bAdd">本棚に追加</button>
+    </div>
+    <div id="bookList"></div>
+
+    <div id="stats">
+      <div class="stat a"><div class="k">もう一度</div><div class="v" id="stAgain">0<small>問</small></div></div>
+      <div class="stat b"><div class="k">あと少し</div><div class="v" id="stAlmost">0<small>問</small></div></div>
+      <div class="stat c"><div class="k">克服した</div><div class="v" id="stDone">0<small>問</small></div></div>
+    </div>
+
+    <div class="card">
+      <div class="lbl">💾 データ管理</div>
+      <div style="font-size:12.5px;color:var(--sub);line-height:1.7;margin-bottom:12px">
+        データ(写真を含む)はこの端末のブラウザ内に自動保存されます。
+        機種変更やバックアップにはエクスポートを使ってください。
+      </div>
+      <div class="row2">
+        <button class="btn" id="expBtn">⬇ エクスポート</button>
+        <button class="btn" id="impBtn">⬆ インポート</button>
+      </div>
+      <input type="file" id="impFile" accept="application/json,.json" hidden>
+      <button class="btn danger wfull" id="wipeBtn">すべてのデータを削除</button>
+    </div>
+  </section>
+
+</main>
+
+<nav>
+  <button data-view="add" class="on"><span class="ic">✍️</span>記録</button>
+  <button data-view="list"><span class="ic">📋</span>一覧</button>
+  <button data-view="review" style="position:relative"><span class="ic">🔁</span>復習<span class="cnt" id="dueCnt" style="display:none">0</span></button>
+  <button data-view="books"><span class="ic">📚</span>本棚</button>
+</nav>
+
+<div id="lightbox"><img id="lightboxImg" alt=""></div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+
+/* ===================== 教科と色(FocusTube共通) ===================== */
+const SUBJECTS = ['数学','英語','理科','国語','社会','その他'];
+const SUBJ_COLORS = {
+  '数学':'#3fb6ff','英語':'#3fb950','理科':'#d29922',
+  '国語':'#ff7b72','社会':'#f778ba','その他':'#a371f7'
+};
+const subjColor = s => SUBJ_COLORS[s] || '#7d8aa0';
+
+/* ===================== IndexedDB(写真も丸ごと保存) ===================== */
+const DB_NAME = 'sankosho-note', DB_VER = 1;
+let db = null;
+function openDB(){
+  return new Promise((res, rej) => {
+    const r = indexedDB.open(DB_NAME, DB_VER);
+    r.onupgradeneeded = e => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains('books'))   d.createObjectStore('books',   { keyPath:'id' });
+      if (!d.objectStoreNames.contains('entries')) d.createObjectStore('entries', { keyPath:'id' });
+      if (!d.objectStoreNames.contains('photos'))  d.createObjectStore('photos',  { keyPath:'id' });
+    };
+    r.onsuccess = () => { db = r.result; res(db); };
+    r.onerror = () => rej(r.error);
+  });
+}
+const idbReq = r => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+const idbAll = store => idbReq(db.transaction(store).objectStore(store).getAll());
+const idbGet = (store, key) => idbReq(db.transaction(store).objectStore(store).get(key));
+const idbPut = (store, val) => idbReq(db.transaction(store, 'readwrite').objectStore(store).put(val));
+const idbDel = (store, key) => idbReq(db.transaction(store, 'readwrite').objectStore(store).delete(key));
+const idbClear = store => idbReq(db.transaction(store, 'readwrite').objectStore(store).clear());
+
+/* メモリ上のキャッシュ */
+let books = [], entries = [];
+const photoURLs = new Map(); // photoId -> objectURL
+
+async function loadAll(){
+  [books, entries] = await Promise.all([idbAll('books'), idbAll('entries')]);
+  books.sort((a,b) => a.createdAt - b.createdAt);
+  entries.sort((a,b) => b.createdAt - a.createdAt);
+}
+async function photoURL(id){
+  if (photoURLs.has(id)) return photoURLs.get(id);
+  const rec = await idbGet('photos', id);
+  if (!rec || !rec.blob) return null;
+  const u = URL.createObjectURL(rec.blob);
+  photoURLs.set(id, u);
+  return u;
+}
+
+/* ===================== 写真の圧縮(長辺1400px / JPEG) ===================== */
+function compressImage(file){
+  return new Promise(res => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const MAX = 1400;
+      const sc = Math.min(1, MAX / Math.max(img.width, img.height));
+      const w = Math.round(img.width * sc), h = Math.round(img.height * sc);
+      const cv = document.createElement('canvas');
+      cv.width = w; cv.height = h;
+      cv.getContext('2d').drawImage(img, 0, 0, w, h);
+      cv.toBlob(b => { URL.revokeObjectURL(url); res(b || file); }, 'image/jpeg', .82);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); res(file); };
+    img.src = url;
+  });
+}
+
+/* ===================== 復習スケジュール(1→3→7→14→30日) ===================== */
+const IVL = [1, 3, 7, 14, 30];
+function nextReviewAt(e){
+  const last = e.reviews.length ? e.reviews[e.reviews.length - 1].t : e.createdAt;
+  const days = IVL[Math.min(e.reviews.length, IVL.length - 1)];
+  return last + days * 86400000;
+}
+function dueEntries(){
+  const now = Date.now();
+  return entries.filter(e => e.status !== 'done' && nextReviewAt(e) <= now);
+}
+function pendingEntries(){
+  const now = Date.now();
+  return entries.filter(e => e.status !== 'done' && nextReviewAt(e) > now);
+}
+
+/* ===================== 画面切り替え ===================== */
+document.querySelectorAll('nav button').forEach(b => {
+  b.onclick = () => showView(b.dataset.view);
+});
+function showView(name){
+  document.querySelectorAll('nav button').forEach(x => x.classList.toggle('on', x.dataset.view === name));
+  document.querySelectorAll('.view').forEach(v => v.classList.toggle('on', v.id === 'view-' + name));
+  if (name === 'list') renderList();
+  if (name === 'review') renderReview();
+  if (name === 'books') renderBooks();
+}
+
+const toastTimer = { id: null };
+function toast(msg){
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('on');
+  clearTimeout(toastTimer.id);
+  toastTimer.id = setTimeout(() => t.classList.remove('on'), 2200);
+}
+
+/* ===================== 記録フォーム ===================== */
+let formStatus = 'again';
+let formPhotos = [];      // [{id?, blob?, url}] 既存はid、新規はblob
+let editingId = null;     // 編集中のentry id
+
+$('fStatus').querySelectorAll('button').forEach(b => {
+  b.onclick = () => {
+    formStatus = b.dataset.v;
+    $('fStatus').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+  };
+});
+function setFormStatus(v){
+  formStatus = v;
+  $('fStatus').querySelectorAll('button').forEach(x => x.classList.toggle('on', x.dataset.v === v));
+}
+
+function renderBookSelect(){
+  const opts = books.map(b => `<option value="${b.id}">${esc(b.title)}(${esc(b.subject)})</option>`).join('');
+  $('fBook').innerHTML = opts || '<option value="">まず本を追加してください</option>';
+  $('fltBook').innerHTML = '<option value="">すべての本</option>' +
+    books.map(b => `<option value="${b.id}">${esc(b.title)}</option>`).join('');
+}
+
+$('fNewBook').onclick = async () => {
+  const title = prompt('参考書の名前を入力');
+  if (!title || !title.trim()) return;
+  const subject = prompt('教科を入力(' + SUBJECTS.join(' / ') + ')', 'その他') || 'その他';
+  const b = { id: uid(), title: title.trim(), subject: SUBJECTS.includes(subject.trim()) ? subject.trim() : 'その他', createdAt: Date.now() };
+  await idbPut('books', b);
+  books.push(b);
+  renderBookSelect();
+  $('fBook').value = b.id;
+  toast('📚 本を追加しました');
+};
+
+$('fCamBtn').onclick = () => $('fCam').click();
+$('fLibBtn').onclick = () => $('fLib').click();
+$('fCam').onchange = e => addFormPhotos(e.target.files).then(() => e.target.value = '');
+$('fLib').onchange = e => addFormPhotos(e.target.files).then(() => e.target.value = '');
+
+async function addFormPhotos(files){
+  for (const f of files){
+    if (!f.type.startsWith('image/')) continue;
+    const blob = await compressImage(f);
+    formPhotos.push({ blob, url: URL.createObjectURL(blob) });
+  }
+  renderFormPhotos();
+}
+function renderFormPhotos(){
+  $('photoRow').innerHTML = formPhotos.map((p, i) =>
+    `<div class="ph"><img src="${p.url}" alt=""><button class="rm" data-i="${i}">✕</button></div>`).join('');
+  $('photoRow').querySelectorAll('.rm').forEach(b => {
+    b.onclick = () => {
+      const p = formPhotos[+b.dataset.i];
+      if (p.blob) URL.revokeObjectURL(p.url);
+      formPhotos.splice(+b.dataset.i, 1);
+      renderFormPhotos();
+    };
+  });
+}
+
+function resetForm(){
+  editingId = null;
+  $('fPage').value = ''; $('fProblem').value = '';
+  $('fMistake').value = ''; $('fPlan').value = ''; $('fTags').value = '';
+  formPhotos.forEach(p => { if (p.blob) URL.revokeObjectURL(p.url); });
+  formPhotos = [];
+  renderFormPhotos();
+  setFormStatus('again');
+  $('fSave').textContent = '保存する';
+  $('fCancel').style.display = 'none';
+}
+$('fCancel').onclick = () => { resetForm(); showView('list'); };
+
+$('fSave').onclick = async () => {
+  if (!books.length){ toast('先に「本棚」から参考書を追加してください'); showView('books'); return; }
+  const bookId = $('fBook').value;
+  const mistake = $('fMistake').value.trim();
+  const page = $('fPage').value.trim();
+  const problem = $('fProblem').value.trim();
+  if (!page && !problem && !mistake){ toast('ページ・問題番号・内容のどれかを入力してください'); return; }
+
+  // 写真を保存してIDに変換
+  const photoIds = [];
+  for (const p of formPhotos){
+    if (p.id){ photoIds.push(p.id); continue; }
+    const id = uid();
+    await idbPut('photos', { id, blob: p.blob });
+    photoURLs.set(id, p.url);   // URLはキャッシュへ引き継ぐ(resetFormで破棄させない)
+    p.id = id; p.blob = null;
+    photoIds.push(id);
+  }
+
+  const tags = $('fTags').value.split(/[,、]/).map(s => s.trim()).filter(Boolean);
+
+  if (editingId){
+    const e = entries.find(x => x.id === editingId);
+    // 外された既存写真を削除
+    for (const old of e.photos){
+      if (!photoIds.includes(old)){
+        await idbDel('photos', old);
+        const u = photoURLs.get(old);
+        if (u){ URL.revokeObjectURL(u); photoURLs.delete(old); }
+      }
+    }
+    Object.assign(e, { bookId, page, problem, mistake, plan: $('fPlan').value.trim(), tags, status: formStatus, photos: photoIds, updatedAt: Date.now() });
+    await idbPut('entries', e);
+    toast('✏️ 記録を更新しました');
+    resetForm();
+    showView('list');
+  } else {
+    const e = {
+      id: uid(), bookId, page, problem, mistake,
+      plan: $('fPlan').value.trim(), tags, status: formStatus,
+      photos: photoIds, reviews: [], createdAt: Date.now(), updatedAt: Date.now()
+    };
+    await idbPut('entries', e);
+    entries.unshift(e);
+    toast('✅ 記録しました');
+    resetForm();
+  }
+  updateDueBadge();
+};
+
+/* ===================== 一覧 ===================== */
+$('q').oninput = () => renderList();
+$('fltBook').onchange = () => renderList();
+$('fltStatus').onchange = () => renderList();
+
+const STATUS_LABEL = { again:'✕ もう一度', almost:'△ あと少し', done:'⭕ 克服した' };
+const fmtDate = t => { const d = new Date(t); return (d.getMonth()+1) + '/' + d.getDate(); };
+
+function entryCard(e, review){
+  const b = books.find(x => x.id === e.bookId);
+  const col = b ? subjColor(b.subject) : '#7d8aa0';
+  const loc = [e.page ? 'p.' + esc(e.page) : '', e.problem ? esc(e.problem) : ''].filter(Boolean).join(' ');
+  const thumbs = e.photos.length
+    ? `<div class="thumbs">${e.photos.map(pid => `<img data-pid="${pid}" alt="写真">`).join('')}</div>` : '';
+  const tags = e.tags && e.tags.length
+    ? `<div class="tags">${e.tags.map(t => `<span>${esc(t)}</span>`).join('')}</div>` : '';
+  const acts = review
+    ? `<div class="rvBtns">
+         <button class="ng" data-rv="again" data-id="${e.id}">✕ まだ</button>
+         <button class="so" data-rv="almost" data-id="${e.id}">△ あと少し</button>
+         <button class="ok" data-rv="done" data-id="${e.id}">⭕ 克服!</button>
+       </div>`
+    : `<div class="acts">
+         <button class="btn small" data-edit="${e.id}">✏️ 編集</button>
+         <button class="btn small danger" data-del="${e.id}">🗑 削除</button>
+         <span class="rv">${e.reviews.length ? '復習 ' + e.reviews.length + '回' : ''}</span>
+       </div>`;
+  return `<div class="entry">
+    <div class="top">
+      <span class="book" style="color:${col};border-color:${col}55;background:${col}18">${esc(b ? b.title : '(削除された本)')}</span>
+      ${loc ? `<span class="loc">${loc}</span>` : ''}
+      <span class="chip ${e.status}">${STATUS_LABEL[e.status]}</span>
+      <span class="date">${fmtDate(e.createdAt)}</span>
+    </div>
+    ${e.mistake ? `<div class="sec"><span class="t">▼ どこで間違えた?</span>${esc(e.mistake)}</div>` : ''}
+    ${e.plan ? `<div class="sec plan"><span class="t">▶ 次はどう解く?</span>${esc(e.plan)}</div>` : ''}
+    ${tags}${thumbs}${acts}
+  </div>`;
+}
+
+async function fillThumbs(root){
+  for (const img of root.querySelectorAll('img[data-pid]')){
+    const u = await photoURL(img.dataset.pid);
+    if (u){ img.src = u; img.onclick = () => openLightbox(u); }
+    else img.remove();
+  }
+}
+function openLightbox(u){
+  $('lightboxImg').src = u;
+  $('lightbox').classList.add('on');
+}
+$('lightbox').onclick = () => $('lightbox').classList.remove('on');
+
+function renderList(){
+  const q = $('q').value.trim().toLowerCase();
+  const fb = $('fltBook').value, fs = $('fltStatus').value;
+  let list = entries;
+  if (fb) list = list.filter(e => e.bookId === fb);
+  if (fs) list = list.filter(e => e.status === fs);
+  if (q) list = list.filter(e => {
+    const b = books.find(x => x.id === e.bookId);
+    return [e.mistake, e.plan, e.page, e.problem, (e.tags||[]).join(' '), b ? b.title : '']
+      .join(' ').toLowerCase().includes(q);
+  });
+  const root = $('entryList');
+  root.innerHTML = list.length
+    ? list.map(e => entryCard(e, false)).join('')
+    : '<div class="empty">まだ記録がありません。<br>「✍️ 記録」から間違えた問題を残していきましょう。</div>';
+  root.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => startEdit(b.dataset.edit));
+  root.querySelectorAll('[data-del]').forEach(b => b.onclick = () => delEntry(b.dataset.del));
+  fillThumbs(root);
+}
+
+async function startEdit(id){
+  const e = entries.find(x => x.id === id);
+  if (!e) return;
+  resetForm();
+  editingId = id;
+  $('fBook').value = e.bookId;
+  $('fPage').value = e.page; $('fProblem').value = e.problem;
+  $('fMistake').value = e.mistake; $('fPlan').value = e.plan;
+  $('fTags').value = (e.tags || []).join(', ');
+  setFormStatus(e.status);
+  formPhotos = [];
+  for (const pid of e.photos){
+    const u = await photoURL(pid);
+    if (u) formPhotos.push({ id: pid, url: u });
+  }
+  renderFormPhotos();
+  $('fSave').textContent = '更新する';
+  $('fCancel').style.display = 'block';
+  showView('add');
+}
+
+async function delEntry(id){
+  const e = entries.find(x => x.id === id);
+  if (!e || !confirm('この記録を削除しますか?(写真も削除されます)')) return;
+  for (const pid of e.photos){
+    await idbDel('photos', pid);
+    const u = photoURLs.get(pid);
+    if (u){ URL.revokeObjectURL(u); photoURLs.delete(pid); }
+  }
+  await idbDel('entries', id);
+  entries = entries.filter(x => x.id !== id);
+  renderList();
+  updateDueBadge();
+  toast('🗑 削除しました');
+}
+
+/* ===================== 復習 ===================== */
+function updateDueBadge(){
+  const n = dueEntries().length;
+  const el = $('dueCnt');
+  el.style.display = n ? 'flex' : 'none';
+  el.textContent = n;
+}
+
+function renderReview(){
+  const due = dueEntries().sort((a,b) => nextReviewAt(a) - nextReviewAt(b));
+  const pending = pendingEntries().sort((a,b) => nextReviewAt(a) - nextReviewAt(b));
+
+  $('dueBanner').innerHTML = due.length
+    ? `今日の解き直し: <b>${due.length}問</b><br>間違えた問題は 1 → 3 → 7 → 14 → 30日 の間隔で出題されます。ノートを見ずにもう一度解いてみましょう。`
+    : `今日の解き直しはありません 🎉<br>「✕ もう一度」「△ あと少し」の問題が期日になるとここに出てきます。`;
+
+  let html = due.map(e => entryCard(e, true)).join('');
+  if (pending.length){
+    html += `<div class="card"><div class="lbl">⏳ 次の解き直し待ち(${pending.length}問)</div>` +
+      pending.slice(0, 20).map(e => {
+        const b = books.find(x => x.id === e.bookId);
+        const loc = [e.page ? 'p.' + esc(e.page) : '', esc(e.problem || '')].filter(Boolean).join(' ');
+        const d = new Date(nextReviewAt(e));
+        return `<div style="display:flex;gap:8px;align-items:center;font-size:12.5px;padding:6px 0;border-top:1px solid var(--line)">
+          <span style="color:${b ? subjColor(b.subject) : '#7d8aa0'};font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:40%">${esc(b ? b.title : '?')}</span>
+          <span>${loc}</span>
+          <span style="margin-left:auto;color:var(--sub)">${d.getMonth()+1}/${d.getDate()} に出題</span>
+        </div>`;
+      }).join('') + '</div>';
+  }
+  const root = $('reviewList');
+  root.innerHTML = html;
+  root.querySelectorAll('[data-rv]').forEach(b => b.onclick = () => doReview(b.dataset.id, b.dataset.rv));
+  fillThumbs(root);
+}
+
+async function doReview(id, result){
+  const e = entries.find(x => x.id === id);
+  if (!e) return;
+  e.reviews.push({ t: Date.now(), r: result });
+  e.status = result;
+  e.updatedAt = Date.now();
+  await idbPut('entries', e);
+  toast(result === 'done' ? '🎉 克服おめでとう!' : result === 'almost' ? '△ あと少し!また出題します' : '✕ 次の復習日にまた出題します');
+  renderReview();
+  updateDueBadge();
+}
+
+/* ===================== 本棚 ===================== */
+function renderSubjectSelect(){
+  $('bSubject').innerHTML = SUBJECTS.map(s => `<option value="${s}">${s}</option>`).join('');
+}
+$('bAdd').onclick = async () => {
+  const title = $('bTitle').value.trim();
+  if (!title){ toast('本の名前を入力してください'); return; }
+  const b = { id: uid(), title, subject: $('bSubject').value, createdAt: Date.now() };
+  await idbPut('books', b);
+  books.push(b);
+  $('bTitle').value = '';
+  renderBookSelect();
+  renderBooks();
+  toast('📚 本を追加しました');
+};
+
+function renderBooks(){
+  const root = $('bookList');
+  root.innerHTML = books.length ? books.map(b => {
+    const es = entries.filter(e => e.bookId === b.id);
+    const done = es.filter(e => e.status === 'done').length;
+    const pct = es.length ? Math.round(done / es.length * 100) : 0;
+    return `<div class="bookCard">
+      <div class="hd">
+        <span class="dot" style="background:${subjColor(b.subject)}"></span>
+        <span class="nm">${esc(b.title)}</span>
+        <span class="sj">${esc(b.subject)}</span>
+      </div>
+      <div class="st">
+        <span class="barwrap"><span class="b" style="width:${pct}%"></span></span>
+        <span class="num">${done}/${es.length}問 克服(${pct}%)</span>
+      </div>
+      <div class="acts">
+        <button class="btn small" data-bedit="${b.id}">✏️ 名前変更</button>
+        <button class="btn small danger" data-bdel="${b.id}">🗑 削除</button>
+      </div>
+    </div>`;
+  }).join('') : '<div class="empty">本がまだありません。上のフォームから追加してください。</div>';
+
+  root.querySelectorAll('[data-bedit]').forEach(x => x.onclick = async () => {
+    const b = books.find(y => y.id === x.dataset.bedit);
+    const t = prompt('本の名前', b.title);
+    if (!t || !t.trim()) return;
+    b.title = t.trim();
+    await idbPut('books', b);
+    renderBookSelect(); renderBooks();
+  });
+  root.querySelectorAll('[data-bdel]').forEach(x => x.onclick = async () => {
+    const b = books.find(y => y.id === x.dataset.bdel);
+    const es = entries.filter(e => e.bookId === b.id);
+    if (!confirm(`「${b.title}」を削除しますか?\n記録${es.length}件(写真含む)も一緒に削除されます。`)) return;
+    for (const e of es){
+      for (const pid of e.photos){ await idbDel('photos', pid); }
+      await idbDel('entries', e.id);
+    }
+    entries = entries.filter(e => e.bookId !== b.id);
+    await idbDel('books', b.id);
+    books = books.filter(y => y.id !== b.id);
+    renderBookSelect(); renderBooks(); updateDueBadge();
+    toast('🗑 削除しました');
+  });
+
+  $('stAgain').innerHTML = entries.filter(e => e.status === 'again').length + '<small>問</small>';
+  $('stAlmost').innerHTML = entries.filter(e => e.status === 'almost').length + '<small>問</small>';
+  $('stDone').innerHTML = entries.filter(e => e.status === 'done').length + '<small>問</small>';
+}
+
+/* ===================== エクスポート / インポート ===================== */
+const blobToDataURL = blob => new Promise(res => {
+  const fr = new FileReader();
+  fr.onload = () => res(fr.result);
+  fr.readAsDataURL(blob);
+});
+
+$('expBtn').onclick = async () => {
+  const photos = await idbAll('photos');
+  const out = {
+    app: 'sankosho-note', version: 1, exportedAt: new Date().toISOString(),
+    books, entries,
+    photos: await Promise.all(photos.map(async p => ({ id: p.id, dataURL: await blobToDataURL(p.blob) })))
+  };
+  const blob = new Blob([JSON.stringify(out)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '参考書ノート_' + new Date().toLocaleDateString('sv') + '.json';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  toast('⬇ エクスポートしました');
+};
+
+$('impBtn').onclick = () => $('impFile').click();
+$('impFile').onchange = async e => {
+  const f = e.target.files[0];
+  e.target.value = '';
+  if (!f) return;
+  try{
+    const data = JSON.parse(await f.text());
+    if (data.app !== 'sankosho-note') throw new Error('形式が違います');
+    if (!confirm(`本${(data.books||[]).length}冊 / 記録${(data.entries||[]).length}件を読み込みます。\n同じIDのデータは上書きされます。よろしいですか?`)) return;
+    for (const b of data.books || []) await idbPut('books', b);
+    for (const en of data.entries || []){
+      en.reviews = en.reviews || []; en.photos = en.photos || []; en.tags = en.tags || [];
+      await idbPut('entries', en);
+    }
+    for (const p of data.photos || []){
+      const blob = await (await fetch(p.dataURL)).blob();
+      await idbPut('photos', { id: p.id, blob });
+      const old = photoURLs.get(p.id);
+      if (old){ URL.revokeObjectURL(old); photoURLs.delete(p.id); }
+    }
+    await loadAll();
+    renderBookSelect(); renderBooks(); renderList(); updateDueBadge();
+    toast('⬆ インポートしました');
+  }catch(err){
+    alert('読み込めませんでした: ' + err.message);
+  }
+};
+
+$('wipeBtn').onclick = async () => {
+  if (!confirm('本・記録・写真をすべて削除します。よろしいですか?')) return;
+  if (!confirm('本当に削除しますか?この操作は取り消せません。')) return;
+  await Promise.all([idbClear('books'), idbClear('entries'), idbClear('photos')]);
+  photoURLs.forEach(u => URL.revokeObjectURL(u));
+  photoURLs.clear();
+  books = []; entries = [];
+  renderBookSelect(); renderBooks(); renderList(); updateDueBadge();
+  toast('データを削除しました');
+};
+
+/* ===================== 起動 ===================== */
+(async function init(){
+  await openDB();
+  await loadAll();
+  renderSubjectSelect();
+  renderBookSelect();
+  updateDueBadge();
+  // 解き直しがある日は復習タブから始める
+  if (dueEntries().length) showView('review');
+})();
+
+/* ===================== 自動アップデート(Service Worker) =====================
+   mainにpush → GitHub Pagesが自動デプロイ → 次に開いたとき最新版を自動取得。
+   ユーザーは何もしなくてOK。更新を検知したら通知だけ出す。 */
+if ('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').then(reg => {
+    reg.addEventListener('updatefound', () => {
+      const nw = reg.installing;
+      if (!nw) return;
+      nw.addEventListener('statechange', () => {
+        if (nw.state === 'activated' && navigator.serviceWorker.controller){
+          toast('✨ アプリが最新版に更新されました');
+        }
+      });
+    });
+    // 開くたびに更新を確認
+    reg.update().catch(()=>{});
+  }).catch(()=>{});
+}
+</script>
+</body>
+</html>
