@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="引き出しプランナー">
+<meta name="theme-color" content="#0d1117">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="../icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
+<title>引き出しプランナー · 収納レイアウトを実寸でモデリング</title>
+<style>
+:root{
+  --bg:#0d1117; --panel:#161b22; --panel2:#1c2330; --line:#2a3344;
+  --text:#e6edf3; --sub:#8b97a8; --accent:#3fb6ff; --accent-dim:rgba(63,182,255,.14);
+  --ok:#3fb950; --warn:#d29922; --err:#ff7b72;
+  --r:14px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;
+  min-height:100vh; padding-bottom:calc(96px + env(safe-area-inset-bottom));
+}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select{font-family:inherit;font-size:16px}
+[hidden]{display:none !important}
+
+header{
+  position:sticky;top:0;z-index:20;
+  background:rgba(13,17,23,.92); backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--line);
+  padding:calc(12px + env(safe-area-inset-top)) 14px 12px;
+  display:flex;align-items:center;gap:10px;
+}
+header h1{font-size:17px;font-weight:700;letter-spacing:.02em;flex:1}
+header h1 span{color:var(--accent)}
+header .badge{font-size:12px;color:var(--sub);border:1px solid var(--line);border-radius:8px;padding:5px 10px;white-space:nowrap}
+
+main{max-width:760px;margin:0 auto;padding:14px}
+
+/* ---- 引き出しタブ ---- */
+.chips{display:flex;gap:7px;overflow-x:auto;padding-bottom:4px;margin-bottom:12px;-webkit-overflow-scrolling:touch}
+.chips::-webkit-scrollbar{display:none}
+.chip{
+  flex:0 0 auto;background:var(--panel);border:1px solid var(--line);border-radius:999px;
+  padding:8px 14px;font-size:13px;color:var(--sub);white-space:nowrap;
+}
+.chip.on{background:var(--accent-dim);border-color:var(--accent);color:var(--accent);font-weight:600}
+.chip.add{color:var(--ok);border-style:dashed}
+
+/* ---- キャンバスカード ---- */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px;margin-bottom:12px}
+.canvashead{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.canvashead .nm{font-size:15px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.canvashead .dim{font-size:12px;color:var(--sub);white-space:nowrap;font-variant-numeric:tabular-nums}
+.canvashead .editbtn{color:var(--sub);font-size:17px;padding:4px 7px;border:1px solid var(--line);border-radius:9px;background:var(--panel2)}
+
+#canvasWrap{position:relative;overflow:hidden;border-radius:10px}
+#canvas{
+  position:relative;margin:0 auto;
+  background:#0a0e14;
+  border:2px solid #40506a;border-radius:6px;
+  touch-action:none;overflow:hidden;
+}
+/* 50mmごとのグリッド線(背景サイズはJSで指定) */
+#canvas .grid{position:absolute;inset:0;pointer-events:none;
+  background-image:linear-gradient(to right,rgba(139,151,168,.12) 1px,transparent 1px),
+                   linear-gradient(to bottom,rgba(139,151,168,.12) 1px,transparent 1px)}
+#canvas .item{
+  position:absolute;border-radius:4px;overflow:hidden;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  border:1.5px solid;cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none;
+  line-height:1.1;
+}
+#canvas .item .em{pointer-events:none}
+#canvas .item .lb{pointer-events:none;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;max-width:96%;text-overflow:ellipsis}
+#canvas .item.sel{box-shadow:0 0 0 2px var(--accent), 0 4px 14px rgba(0,0,0,.5);z-index:5}
+#canvas .item.bad{border-color:var(--err) !important;box-shadow:0 0 0 2px rgba(255,123,114,.55);z-index:4}
+#canvas .item.tall::after{
+  content:"⚠";position:absolute;top:0;right:1px;font-size:11px;color:var(--warn);
+}
+#canvas .item.drag{cursor:grabbing;opacity:.92;z-index:6}
+.rulerX{font-size:10.5px;color:var(--sub);text-align:center;margin-top:5px;font-variant-numeric:tabular-nums}
+
+/* ---- 統計 ---- */
+.stats{display:flex;gap:8px;margin-bottom:12px;font-size:12px;color:var(--sub);flex-wrap:wrap}
+.stats span{border:1px solid var(--line);border-radius:8px;padding:5px 9px;background:var(--panel)}
+.stats b{color:var(--text);font-variant-numeric:tabular-nums}
+.stats .alert{color:var(--err);border-color:var(--err)}
+.stats .caution{color:var(--warn);border-color:var(--warn)}
+
+/* ---- 選択パネル ---- */
+#selPanel .selhead{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+#selPanel .selhead .em{font-size:22px}
+#selPanel .selhead input{
+  flex:1;min-width:0;background:var(--panel2);border:1px solid var(--line);border-radius:9px;
+  color:var(--text);padding:8px 10px;outline:none;font-size:14px;font-weight:600;
+}
+.dimrow{display:flex;gap:8px}
+.dimrow label{flex:1;font-size:11px;color:var(--sub)}
+.dimrow input{
+  width:100%;margin-top:4px;background:var(--panel2);border:1px solid var(--line);border-radius:9px;
+  color:var(--text);padding:8px 8px;outline:none;text-align:center;
+}
+.selbtns{display:flex;gap:8px;margin-top:11px}
+.selbtns button{
+  flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+  padding:10px;font-size:13px;font-weight:600;color:var(--text);
+}
+.selbtns .del{color:var(--err);border-color:rgba(255,123,114,.4)}
+#selWarn{font-size:12px;color:var(--warn);margin-top:9px}
+#selWarn:empty{display:none}
+
+.hint{font-size:12px;color:var(--sub);text-align:center;margin:4px 0 10px;line-height:1.7}
+
+/* ---- 下部の追加ボタン ---- */
+#addBar{
+  position:fixed;left:0;right:0;bottom:0;z-index:25;
+  padding:10px 14px calc(12px + env(safe-area-inset-bottom));
+  background:linear-gradient(to top,rgba(13,17,23,.96) 65%,transparent);
+  display:flex;justify-content:center;
+}
+#openCatalog{
+  width:100%;max-width:480px;background:var(--accent);color:#06121c;
+  border-radius:14px;padding:15px;font-size:15px;font-weight:800;
+  box-shadow:0 6px 22px rgba(63,182,255,.3);
+}
+#openCatalog:active{transform:scale(.98)}
+
+/* ---- カタログシート ---- */
+#sheetBack{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30}
+#sheet{
+  position:fixed;left:0;right:0;bottom:0;z-index:31;
+  background:var(--panel);border-top:1px solid var(--line);
+  border-radius:18px 18px 0 0;max-height:80vh;display:flex;flex-direction:column;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+#sheet .grip{width:44px;height:5px;border-radius:3px;background:var(--line);margin:10px auto 6px}
+#sheet .shead{padding:2px 14px 10px;display:flex;gap:8px;align-items:center}
+#sheet .shead input{
+  flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:11px;
+  color:var(--text);padding:10px 13px;outline:none;
+}
+#sheet .shead input::placeholder{color:var(--sub)}
+#sheet .shead .close{font-size:20px;color:var(--sub);padding:6px 9px}
+#sheet .chips{padding:0 14px;margin-bottom:8px}
+#catCount{font-size:11px;color:var(--sub);padding:0 16px 6px}
+#catGrid{
+  overflow-y:auto;-webkit-overflow-scrolling:touch;padding:2px 14px 16px;
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px;
+}
+.citem{
+  background:var(--panel2);border:1px solid var(--line);border-radius:12px;
+  padding:10px 6px;text-align:center;color:var(--text);
+}
+.citem:active{transform:scale(.96)}
+.citem .em{font-size:26px}
+.citem .nm{font-size:12px;font-weight:600;margin-top:5px;line-height:1.25}
+.citem .sz{font-size:10px;color:var(--sub);margin-top:3px;font-variant-numeric:tabular-nums}
+.citem.custom{border-color:rgba(227,179,65,.5)}
+.citem.newbtn{border-style:dashed;color:var(--ok)}
+.citem.newbtn .em{font-size:24px}
+
+/* ---- モーダル ---- */
+.modalback{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:40;display:flex;align-items:center;justify-content:center;padding:18px}
+.modal{
+  background:var(--panel);border:1px solid var(--line);border-radius:16px;
+  width:100%;max-width:420px;padding:18px;max-height:86vh;overflow-y:auto;
+}
+.modal h2{font-size:15px;font-weight:700;margin-bottom:14px}
+.modal .frow{margin-bottom:12px}
+.modal .frow>label{display:block;font-size:11px;color:var(--sub);margin-bottom:5px}
+.modal input,.modal select{
+  width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+  color:var(--text);padding:10px 12px;outline:none;
+}
+.modal .dimrow input{margin-top:4px}
+.modal .mnote{font-size:11.5px;color:var(--sub);margin:-4px 0 12px;line-height:1.6}
+.modal .check{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--sub);margin-bottom:14px}
+.modal .check input{width:18px;height:18px}
+.mbtns{display:flex;gap:9px}
+.mbtns button{
+  flex:1;border-radius:11px;padding:12px;font-size:14px;font-weight:700;
+  background:var(--panel2);border:1px solid var(--line);color:var(--text);
+}
+.mbtns .primary{background:var(--accent);border-color:var(--accent);color:#06121c}
+.mbtns .danger{color:var(--err);border-color:rgba(255,123,114,.4);flex:0 0 auto;padding:12px 14px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🗄 引き出し<span>プランナー</span></h1>
+  <span class="badge" id="drawerCount">0個</span>
+</header>
+
+<main>
+  <div class="chips" id="drawerTabs"></div>
+
+  <div class="card">
+    <div class="canvashead">
+      <div class="nm" id="dName">–</div>
+      <div class="dim" id="dDim"></div>
+      <button class="editbtn" id="editDrawer" title="引き出しを編集">✎</button>
+    </div>
+    <div id="canvasWrap">
+      <div id="canvas">
+        <div class="grid"></div>
+        <div id="items"></div>
+      </div>
+    </div>
+    <div class="rulerX" id="rulerX"></div>
+  </div>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="card" id="selPanel" hidden>
+    <div class="selhead">
+      <span class="em" id="selEmoji">📦</span>
+      <input id="selName" maxlength="30">
+    </div>
+    <div class="dimrow">
+      <label>幅(mm)<input type="number" id="selW" min="1" max="3000" inputmode="numeric"></label>
+      <label>奥行(mm)<input type="number" id="selD" min="1" max="3000" inputmode="numeric"></label>
+      <label>高さ(mm)<input type="number" id="selH" min="1" max="3000" inputmode="numeric"></label>
+    </div>
+    <div id="selWarn"></div>
+    <div class="selbtns">
+      <button id="selRotate">↻ 回転</button>
+      <button id="selDup">⧉ 複製</button>
+      <button id="selDel" class="del">🗑 削除</button>
+    </div>
+  </div>
+
+  <p class="hint">カタログからアイテムを追加 → ドラッグで配置。タップで選択してサイズ調整・回転。<br>赤枠は「重なり/はみ出し」、⚠ は引き出しの高さを超えています。</p>
+</main>
+
+<div id="addBar">
+  <button id="openCatalog">＋ アイテムを追加</button>
+</div>
+
+<!-- カタログシート -->
+<div id="sheetBack" hidden></div>
+<div id="sheet" hidden>
+  <div class="grip"></div>
+  <div class="shead">
+    <input id="catSearch" type="search" placeholder="🔍 名前で検索(例: ペン、ペンチ、ハサミ)">
+    <button class="close" id="closeSheet">✕</button>
+  </div>
+  <div class="chips" id="catChips"></div>
+  <div id="catCount"></div>
+  <div id="catGrid"></div>
+</div>
+
+<!-- アイテム追加/登録モーダル -->
+<div class="modalback" id="itemModalBack" hidden>
+  <div class="modal">
+    <h2 id="itemModalTitle">アイテムを追加</h2>
+    <div class="frow"><label>名前</label><input id="imName" maxlength="30" placeholder="例: ボールペン"></div>
+    <div class="frow"><label>絵文字(任意)</label><input id="imEmoji" maxlength="4" placeholder="例: 🖊"></div>
+    <div class="frow dimrow">
+      <label>幅(mm)<input type="number" id="imW" min="1" max="3000" inputmode="numeric"></label>
+      <label>奥行(mm)<input type="number" id="imD" min="1" max="3000" inputmode="numeric"></label>
+      <label>高さ(mm)<input type="number" id="imH" min="1" max="3000" inputmode="numeric"></label>
+    </div>
+    <p class="mnote">標準サイズを入れてあります。実物に合わせて自由に変更できます(上から見た幅×奥行と、立てたときの高さ)。</p>
+    <label class="check"><input type="checkbox" id="imSave">マイカタログに登録する(次回から一覧に出ます)</label>
+    <div class="mbtns">
+      <button id="imCancel">キャンセル</button>
+      <button class="primary" id="imAdd">引き出しに追加</button>
+    </div>
+  </div>
+</div>
+
+<!-- 引き出し作成/編集モーダル -->
+<div class="modalback" id="drawerModalBack" hidden>
+  <div class="modal">
+    <h2 id="drawerModalTitle">引き出しを追加</h2>
+    <div class="frow"><label>名前</label><input id="dmName" maxlength="30" placeholder="例: 机の一番上"></div>
+    <div class="frow"><label>プリセットから選ぶ</label><select id="dmPreset"></select></div>
+    <div class="frow dimrow">
+      <label>内寸 幅(mm)<input type="number" id="dmW" min="50" max="3000" inputmode="numeric"></label>
+      <label>内寸 奥行(mm)<input type="number" id="dmD" min="50" max="3000" inputmode="numeric"></label>
+      <label>内寸 高さ(mm)<input type="number" id="dmH" min="10" max="1000" inputmode="numeric"></label>
+    </div>
+    <p class="mnote">メジャーで測った引き出しの「内側」の寸法を入れると実寸どおりにモデリングできます。</p>
+    <div class="mbtns">
+      <button id="dmDelete" class="danger" hidden>🗑</button>
+      <button id="dmCancel">キャンセル</button>
+      <button class="primary" id="dmSave">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+
+/* ===================== カテゴリ & カタログ =====================
+   寸法は「上から見た 幅×奥行」と「高さ」(mm)。一般的な標準サイズ。
+   追加時にユーザーが自由に変更できる。 */
+const CATS = [
+  { id:'pen',   name:'✏️ 筆記具',        color:'#3fb6ff' },
+  { id:'sta',   name:'📎 文房具',        color:'#3fb950' },
+  { id:'tool',  name:'🔧 工具',          color:'#d29922' },
+  { id:'kit',   name:'🍴 キッチン',      color:'#ff7b72' },
+  { id:'care',  name:'🪥 衛生・身支度',  color:'#f778ba' },
+  { id:'dig',   name:'🔌 デジタル',      color:'#a371f7' },
+  { id:'sew',   name:'🧵 裁縫・工作',    color:'#56d4dd' },
+  { id:'doc',   name:'📄 事務・書類',    color:'#ffa657' },
+  { id:'misc',  name:'🎲 その他',        color:'#8b97a8' },
+  { id:'my',    name:'⭐ マイアイテム',  color:'#e3b341' },
+];
+const catColor = c => (CATS.find(x => x.id === c) || CATS[CATS.length-1]).color;
+
+const CATALOG = [
+  /* --- 筆記具 --- */
+  { c:'pen', e:'✏️', n:'鉛筆',              w:175, d:8,   h:8   },
+  { c:'pen', e:'✏️', n:'シャープペン',      w:145, d:10,  h:10  },
+  { c:'pen', e:'🖊', n:'ボールペン',        w:145, d:12,  h:12  },
+  { c:'pen', e:'🖊', n:'ゲルインクペン',    w:145, d:11,  h:11  },
+  { c:'pen', e:'🖋', n:'万年筆',            w:140, d:14,  h:14  },
+  { c:'pen', e:'🖍', n:'油性マーカー',      w:140, d:18,  h:18  },
+  { c:'pen', e:'🖍', n:'蛍光ペン',          w:120, d:21,  h:15  },
+  { c:'pen', e:'🖊', n:'サインペン',        w:135, d:12,  h:12  },
+  { c:'pen', e:'🖌', n:'筆ペン',            w:180, d:16,  h:16  },
+  { c:'pen', e:'🎨', n:'色鉛筆(12色・缶)',  w:185, d:90,  h:12  },
+  { c:'pen', e:'🖍', n:'クレヨン(16色箱)',  w:180, d:120, h:20  },
+  { c:'pen', e:'⬜', n:'消しゴム',          w:55,  d:22,  h:12  },
+  { c:'pen', e:'📏', n:'修正テープ',        w:70,  d:25,  h:12  },
+  { c:'pen', e:'🧴', n:'修正液',            w:70,  d:25,  h:25  },
+  { c:'pen', e:'🔻', n:'鉛筆削り(小)',      w:25,  d:20,  h:20  },
+  { c:'pen', e:'🔩', n:'鉛筆削り(手動)',    w:120, d:70,  h:100 },
+  { c:'pen', e:'📦', n:'替え芯ケース',      w:105, d:20,  h:8   },
+  { c:'pen', e:'🖍', n:'チョーク(箱)',      w:75,  d:60,  h:15  },
+  /* --- 文房具 --- */
+  { c:'sta', e:'✂️', n:'ハサミ',            w:170, d:70,  h:10  },
+  { c:'sta', e:'✂️', n:'小型ハサミ',        w:130, d:55,  h:8   },
+  { c:'sta', e:'🔪', n:'カッター(小)',      w:130, d:15,  h:10  },
+  { c:'sta', e:'🔪', n:'カッター(大)',      w:160, d:30,  h:15  },
+  { c:'sta', e:'🩹', n:'カッターマットA4',  w:300, d:220, h:3   },
+  { c:'sta', e:'🧴', n:'スティックのり',    w:95,  d:22,  h:22  },
+  { c:'sta', e:'🧴', n:'液体のり',          w:120, d:35,  h:35  },
+  { c:'sta', e:'📼', n:'テープのり',        w:85,  d:55,  h:25  },
+  { c:'sta', e:'📼', n:'セロテープ(台付き)',w:160, d:55,  h:85  },
+  { c:'sta', e:'📼', n:'セロテープ(小巻)',  w:60,  d:60,  h:20  },
+  { c:'sta', e:'📼', n:'マスキングテープ',  w:50,  d:50,  h:18  },
+  { c:'sta', e:'📼', n:'ガムテープ',        w:105, d:105, h:50  },
+  { c:'sta', e:'📼', n:'両面テープ',        w:90,  d:90,  h:15  },
+  { c:'sta', e:'📌', n:'ホッチキス',        w:100, d:30,  h:55  },
+  { c:'sta', e:'📦', n:'ホッチキス針(箱)',  w:45,  d:35,  h:15  },
+  { c:'sta', e:'🕳', n:'穴あけパンチ',      w:105, d:60,  h:55  },
+  { c:'sta', e:'📎', n:'ゼムクリップ(箱)',  w:55,  d:35,  h:25  },
+  { c:'sta', e:'🗜', n:'目玉クリップ',      w:45,  d:35,  h:30  },
+  { c:'sta', e:'🗜', n:'ダブルクリップ(箱)',w:90,  d:60,  h:35  },
+  { c:'sta', e:'📏', n:'定規(15cm)',        w:160, d:30,  h:2   },
+  { c:'sta', e:'📏', n:'定規(30cm)',        w:310, d:35,  h:2   },
+  { c:'sta', e:'📐', n:'三角定規',          w:140, d:140, h:2   },
+  { c:'sta', e:'📐', n:'分度器',            w:100, d:55,  h:2   },
+  { c:'sta', e:'🧭', n:'コンパス(ケース)',  w:165, d:60,  h:20  },
+  { c:'sta', e:'🧮', n:'電卓',              w:145, d:105, h:15  },
+  { c:'sta', e:'🟨', n:'付箋',              w:75,  d:75,  h:8   },
+  { c:'sta', e:'📒', n:'メモ帳',            w:105, d:75,  h:10  },
+  { c:'sta', e:'🔴', n:'朱肉',              w:60,  d:60,  h:20  },
+  { c:'sta', e:'🟥', n:'スタンプ台',        w:100, d:65,  h:20  },
+  { c:'sta', e:'📦', n:'輪ゴム(箱)',        w:110, d:65,  h:45  },
+  { c:'sta', e:'📌', n:'画びょう(ケース)',  w:55,  d:55,  h:15  },
+  { c:'sta', e:'🧲', n:'マグネット',        w:30,  d:30,  h:10  },
+  { c:'sta', e:'🏷', n:'ラベルライター',    w:135, d:65,  h:60  },
+  /* --- 工具 --- */
+  { c:'tool', e:'🔧', n:'ペンチ',            w:180, d:60,  h:25 },
+  { c:'tool', e:'🔧', n:'ラジオペンチ',      w:165, d:55,  h:20 },
+  { c:'tool', e:'✂️', n:'ニッパー',          w:150, d:55,  h:20 },
+  { c:'tool', e:'🪛', n:'ドライバー(+)',     w:200, d:30,  h:30 },
+  { c:'tool', e:'🪛', n:'ドライバー(−)',     w:200, d:30,  h:30 },
+  { c:'tool', e:'🪛', n:'精密ドライバーセット', w:120, d:60, h:20 },
+  { c:'tool', e:'🔧', n:'モンキーレンチ',    w:200, d:55,  h:15 },
+  { c:'tool', e:'🔧', n:'スパナ',            w:160, d:35,  h:8  },
+  { c:'tool', e:'🔩', n:'六角レンチセット',  w:90,  d:45,  h:20 },
+  { c:'tool', e:'🔨', n:'金づち',            w:290, d:95,  h:25 },
+  { c:'tool', e:'🔨', n:'ゴムハンマー',      w:280, d:80,  h:40 },
+  { c:'tool', e:'📏', n:'メジャー(コンベックス)', w:65, d:65, h:35 },
+  { c:'tool', e:'📐', n:'水平器',            w:230, d:50,  h:22 },
+  { c:'tool', e:'🪚', n:'ノコギリ(折込)',    w:240, d:45,  h:25 },
+  { c:'tool', e:'🔫', n:'電動ドライバー',    w:200, d:180, h:60 },
+  { c:'tool', e:'📦', n:'ビットセット',      w:100, d:70,  h:25 },
+  { c:'tool', e:'🔩', n:'ネジ(ケース)',      w:100, d:65,  h:30 },
+  { c:'tool', e:'📦', n:'釘(箱)',            w:90,  d:55,  h:30 },
+  { c:'tool', e:'🪢', n:'結束バンド(袋)',    w:200, d:90,  h:15 },
+  { c:'tool', e:'🧤', n:'軍手',              w:230, d:120, h:20 },
+  { c:'tool', e:'🔥', n:'はんだごて',        w:230, d:40,  h:40 },
+  { c:'tool', e:'📟', n:'テスター',          w:140, d:70,  h:35 },
+  { c:'tool', e:'🪥', n:'ヤスリ',            w:210, d:25,  h:15 },
+  { c:'tool', e:'📍', n:'キリ',              w:170, d:25,  h:25 },
+  { c:'tool', e:'🔫', n:'タッカー',          w:150, d:35,  h:60 },
+  /* --- キッチン --- */
+  { c:'kit', e:'🥢', n:'菜箸',              w:330, d:10,  h:10 },
+  { c:'kit', e:'🥢', n:'箸',                w:230, d:8,   h:8  },
+  { c:'kit', e:'🥄', n:'スプーン',          w:195, d:40,  h:25 },
+  { c:'kit', e:'🍴', n:'フォーク',          w:195, d:28,  h:20 },
+  { c:'kit', e:'🔪', n:'テーブルナイフ',    w:210, d:20,  h:10 },
+  { c:'kit', e:'🥄', n:'ティースプーン',    w:140, d:30,  h:15 },
+  { c:'kit', e:'🥄', n:'おたま',            w:300, d:90,  h:45 },
+  { c:'kit', e:'🍳', n:'フライ返し',        w:330, d:90,  h:30 },
+  { c:'kit', e:'🌀', n:'泡立て器',          w:280, d:65,  h:65 },
+  { c:'kit', e:'🥔', n:'ピーラー',          w:145, d:70,  h:15 },
+  { c:'kit', e:'🥫', n:'缶切り',            w:105, d:45,  h:20 },
+  { c:'kit', e:'🍾', n:'栓抜き',            w:120, d:40,  h:15 },
+  { c:'kit', e:'🍷', n:'ワインオープナー',  w:160, d:30,  h:25 },
+  { c:'kit', e:'🥄', n:'計量スプーン',      w:130, d:45,  h:20 },
+  { c:'kit', e:'🥛', n:'計量カップ',        w:145, d:105, h:90 },
+  { c:'kit', e:'✂️', n:'キッチンばさみ',    w:210, d:80,  h:12 },
+  { c:'kit', e:'🍚', n:'しゃもじ',          w:195, d:65,  h:15 },
+  { c:'kit', e:'🦞', n:'トング',            w:230, d:45,  h:35 },
+  { c:'kit', e:'🥤', n:'ストロー(束)',      w:210, d:30,  h:30 },
+  { c:'kit', e:'📦', n:'ラップ(箱)',        w:310, d:45,  h:45 },
+  { c:'kit', e:'📦', n:'アルミホイル',      w:250, d:45,  h:45 },
+  { c:'kit', e:'📦', n:'クッキングシート',  w:250, d:50,  h:50 },
+  { c:'kit', e:'🛍', n:'ジッパー袋(箱)',    w:220, d:115, h:60 },
+  { c:'kit', e:'🟤', n:'コースター',        w:90,  d:90,  h:5  },
+  { c:'kit', e:'🥢', n:'箸置き',            w:45,  d:15,  h:10 },
+  /* --- 衛生・身支度 --- */
+  { c:'care', e:'💅', n:'爪切り',            w:90,  d:20,  h:15 },
+  { c:'care', e:'🪮', n:'毛抜き',            w:90,  d:10,  h:5  },
+  { c:'care', e:'👂', n:'耳かき',            w:150, d:8,   h:8  },
+  { c:'care', e:'📦', n:'綿棒(ケース)',      w:110, d:80,  h:60 },
+  { c:'care', e:'🌡', n:'体温計',            w:130, d:20,  h:12 },
+  { c:'care', e:'🩹', n:'絆創膏(箱)',        w:100, d:70,  h:25 },
+  { c:'care', e:'😷', n:'マスク(箱)',        w:175, d:105, h:90 },
+  { c:'care', e:'💊', n:'常備薬ポーチ',      w:180, d:120, h:40 },
+  { c:'care', e:'🧴', n:'ハンドクリーム',    w:130, d:45,  h:30 },
+  { c:'care', e:'💄', n:'リップクリーム',    w:70,  d:18,  h:18 },
+  { c:'care', e:'🪥', n:'歯ブラシ',          w:180, d:15,  h:15 },
+  { c:'care', e:'🪮', n:'ヘアブラシ',        w:220, d:65,  h:35 },
+  { c:'care', e:'🪮', n:'くし',              w:175, d:30,  h:5  },
+  { c:'care', e:'🪒', n:'カミソリ',          w:130, d:40,  h:20 },
+  { c:'care', e:'🎀', n:'ヘアゴム(束)',      w:60,  d:60,  h:20 },
+  { c:'care', e:'📎', n:'ヘアピン(ケース)',  w:70,  d:50,  h:15 },
+  { c:'care', e:'🪞', n:'手鏡',              w:220, d:105, h:10 },
+  { c:'care', e:'👁', n:'コンタクトケース',  w:65,  d:30,  h:15 },
+  { c:'care', e:'💧', n:'目薬',              w:45,  d:25,  h:60 },
+  { c:'care', e:'🌸', n:'香水(ミニ)',        w:45,  d:45,  h:90 },
+  /* --- デジタル --- */
+  { c:'dig', e:'🔌', n:'USBケーブル(束)',   w:90,  d:90,  h:20 },
+  { c:'dig', e:'🔌', n:'HDMIケーブル(束)',  w:120, d:120, h:30 },
+  { c:'dig', e:'🔌', n:'LANケーブル(束)',   w:110, d:110, h:25 },
+  { c:'dig', e:'🔌', n:'ACアダプタ',        w:75,  d:45,  h:30 },
+  { c:'dig', e:'🔋', n:'モバイルバッテリー',w:145, d:70,  h:15 },
+  { c:'dig', e:'🎧', n:'イヤホン(ケース)',  w:70,  d:70,  h:25 },
+  { c:'dig', e:'🎧', n:'ワイヤレスイヤホン',w:60,  d:45,  h:25 },
+  { c:'dig', e:'💾', n:'USBメモリ',         w:60,  d:20,  h:10 },
+  { c:'dig', e:'💾', n:'SDカード',          w:32,  d:24,  h:2  },
+  { c:'dig', e:'📦', n:'SDカードケース',    w:90,  d:60,  h:15 },
+  { c:'dig', e:'🔋', n:'単3電池(4本)',      w:58,  d:58,  h:15 },
+  { c:'dig', e:'🔋', n:'単4電池(4本)',      w:48,  d:48,  h:12 },
+  { c:'dig', e:'🔋', n:'9V電池',            w:45,  d:26,  h:17 },
+  { c:'dig', e:'🪙', n:'ボタン電池(パック)',w:90,  d:50,  h:5  },
+  { c:'dig', e:'🔌', n:'延長コード',        w:200, d:120, h:45 },
+  { c:'dig', e:'🔌', n:'電源タップ',        w:250, d:60,  h:40 },
+  { c:'dig', e:'🖱', n:'マウス',            w:110, d:60,  h:40 },
+  { c:'dig', e:'📺', n:'テレビリモコン',    w:220, d:50,  h:25 },
+  { c:'dig', e:'❄️', n:'エアコンリモコン',  w:160, d:55,  h:20 },
+  { c:'dig', e:'🎮', n:'ゲームコントローラー', w:155, d:105, h:60 },
+  { c:'dig', e:'📱', n:'スマートフォン',    w:150, d:72,  h:9  },
+  { c:'dig', e:'📱', n:'タブレット',        w:250, d:175, h:8  },
+  { c:'dig', e:'⌚', n:'腕時計',            w:90,  d:70,  h:40 },
+  /* --- 裁縫・工作 --- */
+  { c:'sew', e:'🧵', n:'裁縫箱(ミニ)',      w:210, d:150, h:60 },
+  { c:'sew', e:'🧵', n:'ミシン糸',          w:35,  d:35,  h:60 },
+  { c:'sew', e:'🪡', n:'針山',              w:60,  d:60,  h:40 },
+  { c:'sew', e:'✂️', n:'布切りばさみ',      w:210, d:85,  h:15 },
+  { c:'sew', e:'✂️', n:'糸切りばさみ',      w:105, d:45,  h:10 },
+  { c:'sew', e:'📏', n:'巻尺(裁縫用)',      w:55,  d:55,  h:15 },
+  { c:'sew', e:'🖊', n:'チャコペン',        w:170, d:10,  h:10 },
+  { c:'sew', e:'🧶', n:'毛糸玉',            w:90,  d:90,  h:90 },
+  { c:'sew', e:'🪝', n:'かぎ針',            w:145, d:12,  h:8  },
+  { c:'sew', e:'🥢', n:'編み棒',            w:350, d:10,  h:10 },
+  { c:'sew', e:'🔫', n:'グルーガン',        w:160, d:140, h:45 },
+  { c:'sew', e:'🔘', n:'ボタン(ケース)',    w:80,  d:80,  h:30 },
+  { c:'sew', e:'📌', n:'安全ピン(ケース)',  w:60,  d:45,  h:20 },
+  { c:'sew', e:'🎀', n:'リボン(巻き)',      w:60,  d:60,  h:25 },
+  { c:'sew', e:'🟥', n:'折り紙',            w:150, d:150, h:10 },
+  /* --- 事務・書類 --- */
+  { c:'doc', e:'✉️', n:'封筒(長形3号・束)', w:235, d:120, h:15 },
+  { c:'doc', e:'✉️', n:'封筒(洋形・束)',    w:205, d:140, h:12 },
+  { c:'doc', e:'📮', n:'はがき(束)',        w:148, d:100, h:15 },
+  { c:'doc', e:'📮', n:'切手シート',        w:210, d:100, h:2  },
+  { c:'doc', e:'📓', n:'ノート(A5)',        w:210, d:148, h:5  },
+  { c:'doc', e:'📓', n:'ノート(B5)',        w:252, d:179, h:5  },
+  { c:'doc', e:'📔', n:'手帳',              w:190, d:135, h:15 },
+  { c:'doc', e:'📁', n:'クリアファイル(A4)',w:310, d:220, h:1  },
+  { c:'doc', e:'💳', n:'名刺ケース',        w:100, d:65,  h:15 },
+  { c:'doc', e:'📦', n:'名刺(箱)',          w:95,  d:60,  h:30 },
+  { c:'doc', e:'📕', n:'通帳',              w:140, d:87,  h:5  },
+  { c:'doc', e:'📕', n:'パスポート',        w:128, d:91,  h:5  },
+  { c:'doc', e:'🖃', n:'レターオープナー',  w:170, d:20,  h:5  },
+  { c:'doc', e:'🪪', n:'印鑑',              w:60,  d:12,  h:12 },
+  { c:'doc', e:'📦', n:'印鑑ケース',        w:105, d:40,  h:30 },
+  { c:'doc', e:'🎫', n:'診察券ケース',      w:115, d:80,  h:10 },
+  { c:'doc', e:'🧾', n:'領収書(束)',        w:130, d:95,  h:20 },
+  /* --- その他 --- */
+  { c:'misc', e:'🔑', n:'鍵',                w:60,  d:25,  h:5  },
+  { c:'misc', e:'🔑', n:'キーホルダー付き鍵',w:90,  d:35,  h:10 },
+  { c:'misc', e:'👛', n:'財布(二つ折り)',    w:110, d:95,  h:25 },
+  { c:'misc', e:'👛', n:'長財布',            w:190, d:95,  h:20 },
+  { c:'misc', e:'🪙', n:'小銭入れ',          w:90,  d:70,  h:20 },
+  { c:'misc', e:'👓', n:'メガネ(折り畳み)',  w:140, d:55,  h:40 },
+  { c:'misc', e:'🕶', n:'メガネケース',      w:160, d:60,  h:40 },
+  { c:'misc', e:'👓', n:'老眼鏡',            w:130, d:50,  h:35 },
+  { c:'misc', e:'🔦', n:'懐中電灯',          w:130, d:35,  h:35 },
+  { c:'misc', e:'🔥', n:'ライター',          w:80,  d:25,  h:12 },
+  { c:'misc', e:'🕯', n:'ろうそく(箱)',      w:120, d:70,  h:25 },
+  { c:'misc', e:'🔥', n:'マッチ箱',          w:55,  d:35,  h:10 },
+  { c:'misc', e:'🃏', n:'トランプ',          w:90,  d:65,  h:20 },
+  { c:'misc', e:'🎲', n:'サイコロ',          w:16,  d:16,  h:16 },
+  { c:'misc', e:'☂️', n:'折りたたみ傘',      w:250, d:60,  h:60 },
+  { c:'misc', e:'🛍', n:'エコバッグ(折)',    w:110, d:80,  h:25 },
+  { c:'misc', e:'♨️', n:'カイロ(袋)',        w:130, d:95,  h:15 },
+  { c:'misc', e:'🧿', n:'お守り',            w:70,  d:45,  h:10 },
+];
+
+/* 引き出しプリセット(内寸 mm) */
+const PRESETS = [
+  ['机の引き出し(浅型)',        330, 420, 45 ],
+  ['机の引き出し(深型)',        330, 420, 120],
+  ['学習机センター引き出し',    500, 300, 40 ],
+  ['デスクワゴン引き出し',      350, 400, 60 ],
+  ['キッチン引き出し(上段)',    400, 450, 100],
+  ['キッチン引き出し(深型)',    400, 450, 200],
+  ['カラーボックス引き出し',    380, 270, 120],
+  ['プラスチック小物ケース',    250, 180, 40 ],
+  ['無印PP小物収納(横型)',      245, 110, 85 ],
+  ['衣装ケース',                390, 530, 230],
+];
+
+/* ===================== 状態 ===================== */
+const KEY = 'drawerPlanner.v1';
+let state = null;
+try{ state = JSON.parse(localStorage.getItem(KEY)); }catch(e){}
+if (!state || !Array.isArray(state.drawers)){
+  // 初回: サンプルの引き出しを1つ作る(ペン・ハサミ・ペンチを配置済み)
+  state = {
+    seq: 10,
+    drawers: [{
+      id: 1, name: '机の引き出し', w: 330, d: 420, h: 45,
+      items: [
+        { id:2, e:'🖊', n:'ボールペン', c:'pen',  w:145, d:12, h:12, x:10,  y:10,  rot:0 },
+        { id:3, e:'✂️', n:'ハサミ',     c:'sta',  w:170, d:70, h:10, x:10,  y:40,  rot:0 },
+        { id:4, e:'🔧', n:'ペンチ',     c:'tool', w:180, d:60, h:25, x:10,  y:125, rot:0 },
+      ],
+    }],
+    cur: 1,
+    custom: [],
+  };
+}
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }
+const uid = () => ++state.seq;
+const curDrawer = () => state.drawers.find(d => d.id === state.cur) || state.drawers[0];
+
+let selId = null;       // 選択中アイテムID
+let scale = 1;          // px / mm
+let catFilter = 'all';  // カタログのカテゴリ絞り込み
+let catQuery = '';
+
+/* ===================== 幾何ユーティリティ ===================== */
+// 回転を反映した「上から見た」footprint
+const foot = it => it.rot ? { w: it.d, d: it.w } : { w: it.w, d: it.d };
+function overlap(a, b){
+  return a.x < b.x + b.fw && b.x < a.x + a.fw && a.y < b.y + b.fd && b.y < a.y + a.fd;
+}
+function rects(drawer){
+  return drawer.items.map(it => { const f = foot(it); return { id: it.id, x: it.x, y: it.y, fw: f.w, fd: f.d }; });
+}
+// 各アイテムの問題判定: bad=重なり/はみ出し, tall=高さ超過
+function validate(drawer){
+  const rs = rects(drawer), out = {};
+  for (const r of rs){
+    const it = drawer.items.find(i => i.id === r.id);
+    let bad = r.x < 0 || r.y < 0 || r.x + r.fw > drawer.w || r.y + r.fd > drawer.d;
+    if (!bad) bad = rs.some(o => o.id !== r.id && overlap(r, o));
+    out[r.id] = { bad, tall: it.h > drawer.h };
+  }
+  return out;
+}
+// 空きスポット探索(10mm刻み)。見つからなければ左上に重ねて置く
+function findSpot(drawer, fw, fd){
+  const rs = rects(drawer), step = 10;
+  for (let y = 0; y + fd <= drawer.d; y += step){
+    for (let x = 0; x + fw <= drawer.w; x += step){
+      const r = { x, y, fw, fd };
+      if (!rs.some(o => overlap(r, o))) return { x, y };
+    }
+  }
+  return { x: 0, y: 0 };
+}
+const snap = v => Math.round(v / 5) * 5;
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+function hexRgba(hex, a){
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`;
+}
+
+/* ===================== 描画 ===================== */
+function renderTabs(){
+  $('drawerTabs').innerHTML = state.drawers.map(d =>
+    `<button class="chip${d.id===state.cur?' on':''}" data-id="${d.id}">🗄 ${esc(d.name)}</button>`
+  ).join('') + `<button class="chip add" id="addDrawer">＋ 引き出し</button>`;
+  document.querySelectorAll('#drawerTabs .chip[data-id]').forEach(b => {
+    b.onclick = () => { state.cur = +b.dataset.id; selId = null; save(); renderAll(); };
+  });
+  $('addDrawer').onclick = () => openDrawerModal(null);
+  $('drawerCount').textContent = state.drawers.length + '個';
+}
+
+function renderCanvas(){
+  const d = curDrawer();
+  const wrap = $('canvasWrap');
+  const avail = wrap.clientWidth || 320;
+  scale = Math.min(avail / d.w, 1.6);           // 実寸より拡大しすぎない
+  const cw = Math.round(d.w * scale), ch = Math.round(d.d * scale);
+  const cv = $('canvas');
+  cv.style.width = cw + 'px';
+  cv.style.height = ch + 'px';
+  const g = cv.querySelector('.grid'), gs = 50 * scale;   // 50mmグリッド
+  g.style.backgroundSize = `${gs}px ${gs}px`;
+
+  $('dName').textContent = d.name;
+  $('dDim').textContent = `内寸 ${d.w}×${d.d}×高${d.h}mm`;
+  $('rulerX').textContent = `← 幅 ${d.w}mm →(グリッド1マス = 50mm)`;
+
+  const marks = validate(d);
+  $('items').innerHTML = d.items.map(it => {
+    const f = foot(it), m = marks[it.id];
+    const w = f.w * scale, h = f.d * scale;
+    const col = catColor(it.c);
+    const emSize = clamp(Math.min(w, h) * .5, 9, 26);
+    const showLb = w >= 56 && h >= 34;
+    const cls = 'item' + (it.id === selId ? ' sel' : '') + (m.bad ? ' bad' : '') + (m.tall ? ' tall' : '');
+    return `<div class="${cls}" data-id="${it.id}" style="left:${it.x*scale}px;top:${it.y*scale}px;width:${w}px;height:${h}px;background:${hexRgba(col,.22)};border-color:${hexRgba(col,.75)}">`+
+      `<span class="em" style="font-size:${emSize}px">${it.e || '📦'}</span>`+
+      (showLb ? `<span class="lb" style="font-size:${clamp(h*.16,9,12)}px">${esc(it.n)}</span>` : '')+
+    `</div>`;
+  }).join('');
+}
+
+function renderStats(){
+  const d = curDrawer();
+  const marks = validate(d);
+  const used = d.items.reduce((s, it) => s + it.w * it.d, 0);
+  const pct = d.w * d.d ? Math.round(used / (d.w * d.d) * 100) : 0;
+  const badN = Object.values(marks).filter(m => m.bad).length;
+  const tallN = Object.values(marks).filter(m => m.tall).length;
+  $('stats').innerHTML =
+    `<span>面積使用率 <b>${pct}%</b></span>`+
+    `<span>アイテム <b>${d.items.length}</b>個</span>`+
+    (badN ? `<span class="alert">⛔ 重なり/はみ出し <b>${badN}</b></span>` : '')+
+    (tallN ? `<span class="caution">⚠ 高さ超過 <b>${tallN}</b></span>` : '');
+}
+
+function renderSel(){
+  const d = curDrawer();
+  const it = d.items.find(i => i.id === selId);
+  const p = $('selPanel');
+  if (!it){ p.hidden = true; return; }
+  p.hidden = false;
+  $('selEmoji').textContent = it.e || '📦';
+  if (document.activeElement !== $('selName')) $('selName').value = it.n;
+  for (const [id, v] of [['selW', it.w], ['selD', it.d], ['selH', it.h]]){
+    if (document.activeElement !== $(id)) $(id).value = v;
+  }
+  const m = validate(d)[it.id];
+  $('selWarn').textContent =
+    (m.tall ? `⚠ 高さ${it.h}mmは引き出しの内寸(高さ${d.h}mm)を超えています。寝かせるか浅い物に。 ` : '') +
+    (m.bad ? '⛔ 他のアイテムと重なっているか、引き出しからはみ出しています。' : '');
+}
+
+function renderAll(){ renderTabs(); renderCanvas(); renderStats(); renderSel(); }
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* ===================== ドラッグ操作 ===================== */
+let drag = null;
+$('canvas').addEventListener('pointerdown', e => {
+  const el = e.target.closest('.item');
+  if (!el) return;
+  e.preventDefault();
+  const it = curDrawer().items.find(i => i.id === +el.dataset.id);
+  if (!it) return;
+  drag = { it, el, sx: e.clientX, sy: e.clientY, ox: it.x, oy: it.y, moved: false };
+  el.setPointerCapture(e.pointerId);
+  el.classList.add('drag');
+});
+$('canvas').addEventListener('pointermove', e => {
+  if (!drag) return;
+  const dx = (e.clientX - drag.sx) / scale, dy = (e.clientY - drag.sy) / scale;
+  if (!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 6) return;
+  drag.moved = true;
+  const d = curDrawer(), f = foot(drag.it);
+  drag.it.x = clamp(drag.ox + dx, 0, Math.max(0, d.w - f.w));
+  drag.it.y = clamp(drag.oy + dy, 0, Math.max(0, d.d - f.d));
+  drag.el.style.left = drag.it.x * scale + 'px';
+  drag.el.style.top = drag.it.y * scale + 'px';
+});
+function endDrag(e){
+  if (!drag) return;
+  const { it, el, moved } = drag;
+  el.classList.remove('drag');
+  drag = null;
+  if (moved){
+    const d = curDrawer(), f = foot(it);
+    it.x = clamp(snap(it.x), 0, Math.max(0, d.w - f.w));
+    it.y = clamp(snap(it.y), 0, Math.max(0, d.d - f.d));
+    save();
+  } else {
+    selId = (selId === it.id) ? null : it.id;   // タップで選択/解除
+  }
+  renderCanvas(); renderStats(); renderSel();
+}
+$('canvas').addEventListener('pointerup', endDrag);
+$('canvas').addEventListener('pointercancel', endDrag);
+// 何もない所をタップしたら選択解除
+$('canvas').addEventListener('click', e => {
+  if (!e.target.closest('.item') && selId != null){ selId = null; renderCanvas(); renderSel(); }
+});
+
+/* ===================== 選択パネル ===================== */
+function updateSel(fn){
+  const it = curDrawer().items.find(i => i.id === selId);
+  if (!it) return;
+  fn(it);
+  const d = curDrawer(), f = foot(it);
+  it.x = clamp(it.x, 0, Math.max(0, d.w - f.w));
+  it.y = clamp(it.y, 0, Math.max(0, d.d - f.d));
+  save(); renderCanvas(); renderStats(); renderSel();
+}
+$('selName').addEventListener('input', () => updateSel(it => { it.n = $('selName').value; }));
+for (const [id, k] of [['selW','w'], ['selD','d'], ['selH','h']]){
+  $(id).addEventListener('change', () => updateSel(it => {
+    const v = clamp(Math.round(+$(id).value) || 1, 1, 3000);
+    it[k] = v; $(id).value = v;
+  }));
+}
+$('selRotate').onclick = () => updateSel(it => { it.rot = it.rot ? 0 : 1; });
+$('selDup').onclick = () => {
+  const d = curDrawer();
+  const it = d.items.find(i => i.id === selId);
+  if (!it) return;
+  const f = foot(it), spot = findSpot(d, f.w, f.d);
+  const copy = { ...it, id: uid(), x: spot.x, y: spot.y };
+  d.items.push(copy);
+  selId = copy.id;
+  save(); renderAll();
+};
+$('selDel').onclick = () => {
+  const d = curDrawer();
+  d.items = d.items.filter(i => i.id !== selId);
+  selId = null;
+  save(); renderAll();
+};
+
+/* ===================== カタログシート ===================== */
+function openSheet(){
+  $('sheet').hidden = false; $('sheetBack').hidden = false;
+  renderCatalog();
+}
+function closeSheet(){ $('sheet').hidden = true; $('sheetBack').hidden = true; }
+$('openCatalog').onclick = openSheet;
+$('closeSheet').onclick = closeSheet;
+$('sheetBack').onclick = closeSheet;
+
+function allCatalog(){
+  return CATALOG.concat(state.custom.map(x => ({ ...x, c:'my', my:true })));
+}
+function renderCatChips(){
+  const cats = [{ id:'all', name:'すべて', color:'' }].concat(CATS.filter(c =>
+    c.id !== 'my' || state.custom.length));
+  $('catChips').innerHTML = cats.map(c =>
+    `<button class="chip${catFilter===c.id?' on':''}" data-c="${c.id}">${c.name}</button>`).join('');
+  document.querySelectorAll('#catChips .chip').forEach(b => {
+    b.onclick = () => { catFilter = b.dataset.c; renderCatalog(); };
+  });
+}
+function renderCatalog(){
+  renderCatChips();
+  const q = catQuery.trim();
+  let list = allCatalog();
+  if (catFilter !== 'all') list = list.filter(x => x.c === catFilter);
+  if (q) list = list.filter(x => x.n.includes(q));
+  $('catCount').textContent = `${list.length}種類 ・ タップするとサイズを確認して追加できます`;
+  $('catGrid').innerHTML =
+    `<button class="citem newbtn" id="newCustom"><div class="em">✚</div><div class="nm">オリジナル登録</div><div class="sz">サイズ自由入力</div></button>` +
+    list.map((x, i) =>
+      `<button class="citem${x.my?' custom':''}" data-i="${i}">
+        <div class="em">${x.e}</div><div class="nm">${esc(x.n)}</div>
+        <div class="sz">${x.w}×${x.d}×${x.h}</div>
+      </button>`).join('');
+  document.querySelectorAll('#catGrid .citem[data-i]').forEach(b => {
+    b.onclick = () => openItemModal(list[+b.dataset.i]);
+  });
+  $('newCustom').onclick = () => openItemModal(null);
+}
+$('catSearch').addEventListener('input', () => { catQuery = $('catSearch').value; renderCatalog(); });
+
+/* ===================== アイテム追加モーダル ===================== */
+let modalBase = null;   // 選んだカタログ項目(nullならオリジナル)
+function openItemModal(base){
+  modalBase = base;
+  $('itemModalTitle').textContent = base ? `${base.e} ${base.n} を追加` : 'オリジナルのアイテムを登録';
+  $('imName').value = base ? base.n : '';
+  $('imEmoji').value = base ? base.e : '';
+  $('imW').value = base ? base.w : 100;
+  $('imD').value = base ? base.d : 50;
+  $('imH').value = base ? base.h : 20;
+  $('imSave').checked = !base;
+  $('itemModalBack').hidden = false;
+  if (!base) $('imName').focus();
+}
+function closeItemModal(){ $('itemModalBack').hidden = true; }
+$('imCancel').onclick = closeItemModal;
+$('itemModalBack').addEventListener('click', e => { if (e.target === $('itemModalBack')) closeItemModal(); });
+$('imAdd').onclick = () => {
+  const n = $('imName').value.trim() || (modalBase ? modalBase.n : '無名アイテム');
+  const e = $('imEmoji').value.trim() || (modalBase ? modalBase.e : '📦');
+  const w = clamp(Math.round(+$('imW').value) || 1, 1, 3000);
+  const dd = clamp(Math.round(+$('imD').value) || 1, 1, 3000);
+  const h = clamp(Math.round(+$('imH').value) || 1, 1, 3000);
+  const c = modalBase ? modalBase.c : 'my';
+
+  if ($('imSave').checked){
+    state.custom.push({ e, n, w, d: dd, h });
+  }
+  const d = curDrawer();
+  const fw = Math.min(w, d.w), fd = Math.min(dd, d.d);   // 探索用(大きすぎても一応置く)
+  const spot = findSpot(d, fw, fd);
+  const it = { id: uid(), e, n, c: c === 'my' ? 'my' : c, w, d: dd, h, x: spot.x, y: spot.y, rot: 0 };
+  d.items.push(it);
+  selId = it.id;
+  save();
+  closeItemModal(); closeSheet();
+  renderAll();
+  $('selPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+};
+
+/* ===================== 引き出しモーダル ===================== */
+let editingDrawerId = null;   // nullなら新規
+function openDrawerModal(id){
+  editingDrawerId = id;
+  const d = id != null ? state.drawers.find(x => x.id === id) : null;
+  $('drawerModalTitle').textContent = d ? '引き出しを編集' : '引き出しを追加';
+  $('dmName').value = d ? d.name : `引き出し${state.drawers.length + 1}`;
+  $('dmW').value = d ? d.w : 330;
+  $('dmD').value = d ? d.d : 420;
+  $('dmH').value = d ? d.h : 45;
+  $('dmPreset').innerHTML = `<option value="">(選択でサイズ入力)</option>` +
+    PRESETS.map((p, i) => `<option value="${i}">${p[0]} ${p[1]}×${p[2]}×${p[3]}</option>`).join('');
+  $('dmPreset').value = '';
+  $('dmDelete').hidden = !(d && state.drawers.length > 1);
+  $('drawerModalBack').hidden = false;
+}
+function closeDrawerModal(){ $('drawerModalBack').hidden = true; }
+$('dmCancel').onclick = closeDrawerModal;
+$('drawerModalBack').addEventListener('click', e => { if (e.target === $('drawerModalBack')) closeDrawerModal(); });
+$('dmPreset').addEventListener('change', () => {
+  const p = PRESETS[+$('dmPreset').value];
+  if (!p) return;
+  if (!$('dmName').value.trim() || editingDrawerId == null) $('dmName').value = p[0];
+  $('dmW').value = p[1]; $('dmD').value = p[2]; $('dmH').value = p[3];
+});
+$('dmSave').onclick = () => {
+  const name = $('dmName').value.trim() || '引き出し';
+  const w = clamp(Math.round(+$('dmW').value) || 300, 50, 3000);
+  const d = clamp(Math.round(+$('dmD').value) || 400, 50, 3000);
+  const h = clamp(Math.round(+$('dmH').value) || 50, 10, 1000);
+  if (editingDrawerId != null){
+    const dr = state.drawers.find(x => x.id === editingDrawerId);
+    Object.assign(dr, { name, w, d, h });
+  } else {
+    const dr = { id: uid(), name, w, d, h, items: [] };
+    state.drawers.push(dr);
+    state.cur = dr.id;
+    selId = null;
+  }
+  save(); closeDrawerModal(); renderAll();
+};
+$('dmDelete').onclick = () => {
+  const dr = state.drawers.find(x => x.id === editingDrawerId);
+  if (!confirm(`「${dr.name}」を中身ごと削除しますか?`)) return;
+  state.drawers = state.drawers.filter(x => x.id !== editingDrawerId);
+  if (state.cur === editingDrawerId) state.cur = state.drawers[0].id;
+  selId = null;
+  save(); closeDrawerModal(); renderAll();
+};
+$('editDrawer').onclick = () => openDrawerModal(curDrawer().id);
+
+/* ===================== その他 ===================== */
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape'){
+    if (!$('itemModalBack').hidden) closeItemModal();
+    else if (!$('drawerModalBack').hidden) closeDrawerModal();
+    else if (!$('sheet').hidden) closeSheet();
+    else if (selId != null){ selId = null; renderCanvas(); renderSel(); }
+  }
+  if ((e.key === 'Delete' || e.key === 'Backspace') && selId != null &&
+      !/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)){
+    $('selDel').click();
+  }
+});
+let rsz = null;
+window.addEventListener('resize', () => { clearTimeout(rsz); rsz = setTimeout(renderCanvas, 120); });
+
+renderAll();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('../sw.js', { scope: '../' }).catch(()=>{});
+</script>
+</body>
+</html>
