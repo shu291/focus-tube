@@ -1,0 +1,17 @@
+{
+  "name": "引き出しプランナー",
+  "short_name": "引き出し",
+  "description": "引き出し収納のレイアウトを実寸(mm)でモデリング。ペン・ペンチ・ハサミなど約180種のカタログからサイズを自由に変えてアイテムを置き、ドラッグで配置。重なり・はみ出し・高さ超過を自動チェック。",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d1117",
+  "theme_color": "#0d1117",
+  "icons": [
+    { "src": "../icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "../icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "../icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "../icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
