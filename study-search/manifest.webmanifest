@@ -1,0 +1,17 @@
+{
+  "name": "勉強サーチ",
+  "short_name": "勉強サーチ",
+  "description": "Geminiが検索ワードを判定して、勉強に関係ない検索をブロックするYouTube検索アプリ。",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d1117",
+  "theme_color": "#0d1117",
+  "icons": [
+    { "src": "../icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "../icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "../icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "../icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
