@@ -14,8 +14,8 @@ function check(name, cond, extra) {
 }
 
 // ---- モックの状態(テスト途中で切り替える) ----
-const mode = { judgeFail: false, filterFail: false, ytQuota: false };
-const counters = { judge: 0, filter: 0, ytSearch: 0, ytVideos: 0 };
+const mode = { judgeFail: false, filterFail: false, ytQuota: false, gm429: [] }; // gm429: 429を返すモデル名
+const counters = { judge: 0, filter: 0, ytSearch: 0, ytVideos: 0, byModel: {} };
 
 const THUMB_SVG = `<svg xmlns='http://www.w3.org/2000/svg' width='320' height='180'><rect width='320' height='180' fill='#1c2330'/><text x='160' y='95' fill='#8b97a8' font-size='18' text-anchor='middle' font-family='sans-serif'>thumbnail</text></svg>`;
 
@@ -56,7 +56,12 @@ async function main() {
       const body = route.request().postDataJSON();
       const prompt = body.contents[0].parts[0].text;
       const isJudge = prompt.includes('検索キーワード: 「');
+      const model = (url.match(/models\/([^:]+):/) || [])[1] || '?';
+      counters.byModel[model] = (counters.byModel[model] || 0) + 1;
       await new Promise(r => setTimeout(r, 150)); // 実APIっぽい遅延(busy状態の確認用)
+      if (mode.gm429.includes(model)) {
+        return route.fulfill({ status: 429, contentType: 'application/json', body: JSON.stringify({ error: { code: 429, message: 'You exceeded your current quota. * Quota exceeded for metric: generate_content_free_tier_requests, limit: 0', status: 'RESOURCE_EXHAUSTED' } }) });
+      }
       if (isJudge) {
         counters.judge++;
         if (mode.judgeFail) return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: { message: 'mock internal error', status: 'INTERNAL' } }) });
@@ -207,6 +212,24 @@ async function main() {
   const errText2 = await page.textContent('.errcard');
   check('🔍 YouTubeクォータ切れの専用メッセージ', errText2.includes('無料枠を使い切りました'), JSON.stringify(errText2.trim().slice(0, 80)));
   mode.ytQuota = false;
+
+  // 既定モデルがクォータ0(初回から429)→ 次のモデルへ自動フォールバックして検索成功
+  mode.gm429 = ['gemini-2.5-flash-lite'];
+  await doSearch('化学 mol計算');
+  await page.waitForSelector('.vcard');
+  const savedModel = await page.evaluate(() => localStorage.getItem('studySearch.model'));
+  check('🔍 モデルが429(割り当て0)でも自動フォールバックで検索成功', (await page.locator('.vcard').count()) === 3);
+  check('🔍 フォールバック先モデルが記憶される', savedModel === 'gemini-2.5-flash', `saved=${savedModel}, byModel=${JSON.stringify(counters.byModel)}`);
+  mode.gm429 = [];
+
+  // 全モデルが429 → 詳細つきのクォータエラー表示
+  mode.gm429 = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.0-flash'];
+  await doSearch('古文 助動詞');
+  await page.waitForSelector('.errcard');
+  const errQuota = await page.textContent('.errcard');
+  check('🔍 全モデル429時は無料枠上限メッセージ+Googleの詳細を表示', errQuota.includes('無料枠の上限') && errQuota.includes('詳細') && errQuota.includes('limit: 0'), JSON.stringify(errQuota.trim().slice(0, 120)));
+  await page.screenshot({ path: SHOT('shot-07-gm-quota.png'), fullPage: true });
+  mode.gm429 = [];
 
   // 結果フィルタだけ失敗 → 結果は出す+注意書き(フェイルオープン)
   mode.filterFail = true;

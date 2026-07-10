@@ -110,7 +110,7 @@ header h1 span{color:var(--accent)}
 .blockcard .cheer{font-size:12.5px;color:var(--sub);margin-top:14px}
 .errcard{border-color:rgba(210,153,34,.55)}
 .errcard h2{font-size:14.5px;color:var(--warn);margin-bottom:6px}
-.errcard p{font-size:13px;color:var(--sub)}
+.errcard p{font-size:13px;color:var(--sub);overflow-wrap:break-word;word-break:break-word}
 .note{
   font-size:12.5px;color:var(--warn);background:rgba(210,153,34,.1);
   border:1px solid rgba(210,153,34,.4);border-radius:10px;padding:9px 13px;margin-bottom:14px;
@@ -258,10 +258,11 @@ footer a{color:var(--sub)}
     <div class="field">
       <label><b>Geminiモデル</b></label>
       <select id="inModel">
-        <option value="gemini-2.5-flash">gemini-2.5-flash(おすすめ)</option>
-        <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite(速い・軽い)</option>
+        <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite(おすすめ・無料枠が広い)</option>
+        <option value="gemini-2.5-flash">gemini-2.5-flash(かしこい)</option>
         <option value="gemini-2.0-flash">gemini-2.0-flash(予備)</option>
       </select>
+      <div class="hint">無料枠で使えない・上限のときは、使えるモデルに自動で切り替えて記憶します</div>
     </div>
     <label class="showrow"><input type="checkbox" id="showKeys">キーを表示する</label>
     <div class="btnrow">
@@ -284,7 +285,8 @@ const LS = {
   recent: 'studySearch.recent',
   cache:  'studySearch.verdicts'
 };
-const MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash'];
+// 上から順に試す。無料枠の広い軽量モデルを既定にする
+const MODELS = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.0-flash'];
 const state = {
   gmKey: localStorage.getItem(LS.gm) || '',
   ytKey: localStorage.getItem(LS.yt) || '',
@@ -366,7 +368,28 @@ function fmtAgo(iso){
 }
 
 /* ===================== Gemini API ===================== */
+// 無料枠で使えないモデルは最初の1回から429が返ることがある(割り当て0)。
+// 429/404/503 のときは他のモデルを自動で試し、使えたモデルを記憶する。
+const GM_FALLBACK_STATUS = [429, 404, 503];
 async function geminiGenerate(prompt, schema){
+  const order = [state.model].concat(MODELS.filter(m => m !== state.model));
+  let lastErr = null;
+  for (const model of order){
+    try{
+      const out = await geminiGenerateWith(model, prompt, schema);
+      if (model !== state.model){
+        state.model = model; // 使えたモデルを次回から最初に使う
+        try{ localStorage.setItem(LS.model, model); }catch(e){}
+      }
+      return out;
+    }catch(e){
+      lastErr = e;
+      if (!GM_FALLBACK_STATUS.includes(e.status)) throw e; // キー不正などは別モデルでも直らない
+    }
+  }
+  throw lastErr;
+}
+async function geminiGenerateWith(model, prompt, schema){
   const body = {
     contents: [{ parts: [{ text: prompt }] }],
     generationConfig: {
@@ -377,9 +400,9 @@ async function geminiGenerate(prompt, schema){
     }
   };
   // 2.5系は思考をオフにして判定を速く・軽くする
-  if (/^gemini-2\.5/.test(state.model)) body.generationConfig.thinkingConfig = { thinkingBudget: 0 };
+  if (/^gemini-2\.5/.test(model)) body.generationConfig.thinkingConfig = { thinkingBudget: 0 };
   const data = await fetchJSON(
-    'https://generativelanguage.googleapis.com/v1beta/models/' + state.model + ':generateContent',
+    'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent',
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': state.gmKey },
@@ -450,9 +473,10 @@ async function filterVideos(q, videos){
 }
 
 function gmErrorMessage(e){
-  if (e.status === 400 || e.status === 403) return 'Gemini APIキーが正しくないようです。「⚙️ APIキー設定」を確認してください。';
-  if (e.status === 429) return 'Geminiの利用上限に達しました。少し時間をおいてもう一度試してください。';
-  if (e.status === 404) return '選択中のGeminiモデルが使えないようです。設定で別のモデルを選んでください。';
+  const detail = e.status ? ' (詳細: ' + String(e.message || '').slice(0, 200) + ')' : '';
+  if (e.status === 400 || e.status === 403) return 'Gemini APIキーが正しくないようです。「⚙️ APIキー設定」を確認してください。' + detail;
+  if (e.status === 429) return 'Geminiの無料枠の上限に達しているようです(ほかのモデルも自動で試しました)。少し時間をおいてもう一度試してください。' + detail;
+  if (e.status === 404) return '使えるGeminiモデルが見つかりませんでした。設定で別のモデルを選んでください。' + detail;
   return 'Geminiでの判定に失敗しました: ' + e.message;
 }
 
