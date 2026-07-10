@@ -29,7 +29,7 @@ python3 -m http.server 8399 --bind 127.0.0.1 &   # 対象: http://127.0.0.1:8399
   それ以外は動画フィルタ呼び出し。`{candidates:[{content:{parts:[{text: JSON文字列}]}}]}` を返す
 - `www.googleapis.com/youtube/v3/search` / `/videos` … search.list は**タイトルをHTMLエスケープ済み**で返すのが実API仕様(`&amp;` など)。モックも合わせること
 - `i.ytimg.com` はSVG、`youtube-nocookie.com` は簡易HTMLでよい
-- 完成済みスクリプト: `.claude/skills/verify/e2e-study-search.mjs`(34チェック。
+- 完成済みスクリプト: `.claude/skills/verify/e2e-study-search.mjs`(37チェック。
   `node e2e-study-search.mjs` で実行、スクリーンショットは `shots/` に出力)
 
 ## 必ず踏む導線(study-search)
