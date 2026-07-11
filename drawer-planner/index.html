@@ -187,7 +187,29 @@ main{max-width:760px;margin:0 auto;padding:14px}
   background:var(--panel2);border:1px solid var(--line);color:var(--text);
 }
 .mbtns .primary{background:var(--accent);border-color:var(--accent);color:#06121c}
+.mbtns .primary:disabled{opacity:.4;filter:grayscale(.5)}
 .mbtns .danger{color:var(--err);border-color:rgba(255,123,114,.4);flex:0 0 auto;padding:12px 14px}
+
+/* ---- 3Dプリント ---- */
+#openPrint{
+  flex:0 0 auto;background:var(--panel2);color:var(--text);border:1px solid var(--line);
+  border-radius:14px;padding:15px 16px;font-size:15px;font-weight:700;white-space:nowrap;
+}
+#openPrint:active{transform:scale(.97)}
+.modal.wide{max-width:460px}
+#prevWrap{background:#0a0e14;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:12px}
+#prev{display:block;width:100%;height:230px;touch-action:none}
+#prevEmpty{padding:40px 16px;text-align:center;color:var(--sub);font-size:13px;line-height:1.7}
+.pmeta{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;font-size:12px;color:var(--sub)}
+.pmeta span{border:1px solid var(--line);border-radius:8px;padding:5px 9px;background:var(--panel2)}
+.pmeta b{color:var(--text);font-variant-numeric:tabular-nums}
+.pmeta .warn{color:var(--warn);border-color:var(--warn)}
+.seg{display:flex;gap:6px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:4px}
+.seg button{flex:1;border-radius:7px;padding:8px;font-size:12.5px;font-weight:600;color:var(--sub);background:none}
+.seg button.on{background:var(--accent-dim);color:var(--accent)}
+.prow{display:flex;gap:10px;margin-bottom:12px}
+.prow>label{flex:1;font-size:11px;color:var(--sub)}
+.prow input{width:100%;margin-top:4px;text-align:center}
 </style>
 </head>
 <body>
@@ -239,6 +261,7 @@ main{max-width:760px;margin:0 auto;padding:14px}
 </main>
 
 <div id="addBar">
+  <button id="openPrint" title="3Dプリント用の仕切りトレーを書き出す">🖨 3D</button>
   <button id="openCatalog">＋ アイテムを追加</button>
 </div>
 
@@ -271,6 +294,54 @@ main{max-width:760px;margin:0 auto;padding:14px}
     <div class="mbtns">
       <button id="imCancel">キャンセル</button>
       <button class="primary" id="imAdd">引き出しに追加</button>
+    </div>
+  </div>
+</div>
+
+<!-- 3Dプリント(仕切りトレー書き出し)モーダル -->
+<div class="modalback" id="printModalBack" hidden>
+  <div class="modal wide">
+    <h2>🖨 3Dプリント用トレーを作る</h2>
+    <div id="prevWrap">
+      <canvas id="prev"></canvas>
+      <div id="prevEmpty" hidden></div>
+    </div>
+    <div class="pmeta" id="pmeta"></div>
+
+    <div class="frow" id="scopeRow" hidden>
+      <label>作る範囲</label>
+      <div class="seg" id="scopeSeg">
+        <button data-v="all" class="on">引き出し全体</button>
+        <button data-v="sel">選択中のアイテムだけ</button>
+      </div>
+    </div>
+
+    <div class="frow">
+      <label>ベースの形</label>
+      <div class="seg" id="baseSeg">
+        <button data-v="fit" class="on">アイテムに合わせる(小さい)</button>
+        <button data-v="drawer">引き出しサイズ</button>
+      </div>
+    </div>
+
+    <div class="frow">
+      <label>仕切りの高さ</label>
+      <div class="seg" id="heightSeg">
+        <button data-v="uniform" class="on">そろえる</button>
+        <button data-v="item">アイテムごと</button>
+      </div>
+    </div>
+
+    <div class="prow">
+      <label>壁の厚み(mm)<input type="number" id="pWall" min="1" max="10" step="0.2" inputmode="decimal"></label>
+      <label>底の厚み(mm)<input type="number" id="pFloor" min="0.4" max="10" step="0.2" inputmode="decimal"></label>
+      <label>すき間(mm)<input type="number" id="pClear" min="0" max="10" step="0.5" inputmode="decimal"></label>
+    </div>
+    <p class="mnote">「すき間」はアイテムと壁のゆとり。実物がぴったり収まるよう0.5〜2mm程度を推奨。生成した .stl をスライサー(Cura等)に読み込んで印刷できます。</p>
+
+    <div class="mbtns">
+      <button id="pmCancel">閉じる</button>
+      <button class="primary" id="pmDownload">⬇ STLを保存</button>
     </div>
   </div>
 </div>
@@ -894,10 +965,244 @@ $('dmDelete').onclick = () => {
 };
 $('editDrawer').onclick = () => openDrawerModal(curDrawer().id);
 
+/* ===================== 3Dプリント(仕切りトレーSTL) =====================
+   配置したアイテムの footprint に合わせた「仕切りトレー(オーガナイザー)」を
+   軸並行ボックスの集合として生成し、バイナリSTLで書き出す。依存ライブラリなし。 */
+const clampN = (v, lo, hi) => Math.max(lo, Math.min(hi, isFinite(+v) ? +v : lo));
+const round1 = v => Math.round(v * 10) / 10;
+const printOpts = { scope:'all', base:'fit', height:'uniform', wall:2, floor:1.5, clear:1.5 };
+let lastTray = null;
+
+// スコープ(全体/選択中)を反映した対象アイテム
+function printItems(){
+  const d = curDrawer();
+  if (printOpts.scope === 'sel' && selId != null){
+    const it = d.items.find(i => i.id === selId);
+    return it ? [it] : [];
+  }
+  return d.items;
+}
+
+// トレーを軸並行ボックスの集合として生成
+function buildTray(){
+  const d = curDrawer();
+  const items = printItems();
+  const wall = clampN(printOpts.wall, 0.4, 20);
+  let floorT = clampN(printOpts.floor, 0.4, 40);
+  const clr = clampN(printOpts.clear, 0, 20);
+  floorT = Math.min(floorT, Math.max(0.4, d.h - 4));       // 底が厚すぎて内寸に収まらない保険
+  const maxDepth = Math.max(4, d.h - floorT);               // 引き出しに入る最大の仕切り高さ
+
+  if (!items.length) return { boxes:[], dims:{w:0,d:0,h:0}, pockets:0, overlap:false };
+
+  // 各アイテムのポケット矩形(footprint + すき間)と深さ
+  const pk = items.map(it => {
+    const f = foot(it);
+    const depth = clampN((it.h || 10) + clr, 4, maxDepth);
+    return { x0: it.x - clr, y0: it.y - clr, x1: it.x + f.w + clr, y1: it.y + f.d + clr, depth };
+  });
+  const rimDepth = Math.max(...pk.map(p => p.depth));
+  if (printOpts.height === 'uniform') pk.forEach(p => p.depth = rimDepth);
+
+  // 床の範囲(ベース形)
+  let FX0, FY0, FX1, FY1;
+  if (printOpts.base === 'drawer'){
+    FX0 = 0; FY0 = 0; FX1 = d.w; FY1 = d.d;
+  } else {
+    FX0 = Math.min(...pk.map(p => p.x0 - wall));
+    FY0 = Math.min(...pk.map(p => p.y0 - wall));
+    FX1 = Math.max(...pk.map(p => p.x1 + wall));
+    FY1 = Math.max(...pk.map(p => p.y1 + wall));
+  }
+  const clX = v => clampN(v, FX0, FX1), clY = v => clampN(v, FY0, FY1);
+
+  const boxes = [];
+  const push = (x0, y0, z0, x1, y1, z1, t) => {
+    x0 = clX(x0); x1 = clX(x1); y0 = clY(y0); y1 = clY(y1);
+    if (x1 - x0 > 1e-6 && y1 - y0 > 1e-6 && z1 - z0 > 1e-6) boxes.push({ x0, y0, z0, x1, y1, z1, t });
+  };
+
+  push(FX0, FY0, 0, FX1, FY1, floorT, 'floor');            // 床スラブ
+
+  if (printOpts.base === 'drawer'){                         // 引き出しサイズなら外周壁も
+    const top = floorT + rimDepth;
+    push(FX0, FY0, 0, FX1, FY0 + wall, top, 'wall');
+    push(FX0, FY1 - wall, 0, FX1, FY1, top, 'wall');
+    push(FX0, FY0, 0, FX0 + wall, FY1, top, 'wall');
+    push(FX1 - wall, FY0, 0, FX1, FY1, top, 'wall');
+  }
+
+  for (const p of pk){                                      // ポケットごとの囲い壁(4枚)
+    const top = floorT + p.depth;
+    const ox0 = p.x0 - wall, oy0 = p.y0 - wall, ox1 = p.x1 + wall, oy1 = p.y1 + wall;
+    push(ox0, oy0, 0, p.x0, oy1, top, 'wall');   // 左
+    push(p.x1, oy0, 0, ox1, oy1, top, 'wall');   // 右
+    push(p.x0, oy0, 0, p.x1, p.y0, top, 'wall'); // 前
+    push(p.x0, p.y1, 0, p.x1, oy1, top, 'wall'); // 後
+  }
+
+  for (const b of boxes){ b.x0 -= FX0; b.x1 -= FX0; b.y0 -= FY0; b.y1 -= FY0; }  // 原点を0,0へ
+
+  let overlap = false;                                      // ポケット同士の重なり(印刷警告)
+  for (let i = 0; i < pk.length && !overlap; i++)
+    for (let j = i + 1; j < pk.length; j++)
+      if (pk[i].x0 < pk[j].x1 && pk[j].x0 < pk[i].x1 && pk[i].y0 < pk[j].y1 && pk[j].y0 < pk[i].y1){ overlap = true; break; }
+
+  return {
+    boxes,
+    dims: { w: round1(FX1 - FX0), d: round1(FY1 - FY0), h: round1(floorT + rimDepth) },
+    pockets: pk.length, overlap
+  };
+}
+
+// 各ボックスの12三角形(外向きCCW)を頂点インデックスで定義
+const BOX_TRIS = [
+  [0,2,1],[0,3,2], [4,5,6],[4,6,7],
+  [0,1,5],[0,5,4], [3,7,6],[3,6,2],
+  [0,4,7],[0,7,3], [1,2,6],[1,6,5]
+];
+function boxesToSTL(boxes){
+  const triCount = boxes.length * 12;
+  const buf = new ArrayBuffer(84 + triCount * 50);
+  const dv = new DataView(buf);
+  const tag = 'drawer-planner tray (mm)';
+  for (let i = 0; i < tag.length; i++) dv.setUint8(i, tag.charCodeAt(i));
+  dv.setUint32(80, triCount, true);
+  let o = 84;
+  for (const b of boxes){
+    const c = [
+      [b.x0,b.y0,b.z0],[b.x1,b.y0,b.z0],[b.x1,b.y1,b.z0],[b.x0,b.y1,b.z0],
+      [b.x0,b.y0,b.z1],[b.x1,b.y0,b.z1],[b.x1,b.y1,b.z1],[b.x0,b.y1,b.z1]
+    ];
+    for (const t of BOX_TRIS){
+      const p = c[t[0]], q = c[t[1]], r = c[t[2]];
+      let nx = (q[1]-p[1])*(r[2]-p[2]) - (q[2]-p[2])*(r[1]-p[1]);
+      let ny = (q[2]-p[2])*(r[0]-p[0]) - (q[0]-p[0])*(r[2]-p[2]);
+      let nz = (q[0]-p[0])*(r[1]-p[1]) - (q[1]-p[1])*(r[0]-p[0]);
+      const L = Math.hypot(nx, ny, nz) || 1; nx/=L; ny/=L; nz/=L;
+      dv.setFloat32(o,    nx, true); dv.setFloat32(o+4,  ny, true); dv.setFloat32(o+8,  nz, true);
+      dv.setFloat32(o+12, p[0], true); dv.setFloat32(o+16, p[1], true); dv.setFloat32(o+20, p[2], true);
+      dv.setFloat32(o+24, q[0], true); dv.setFloat32(o+28, q[1], true); dv.setFloat32(o+32, q[2], true);
+      dv.setFloat32(o+36, r[0], true); dv.setFloat32(o+40, r[1], true); dv.setFloat32(o+44, r[2], true);
+      dv.setUint16(o+48, 0, true);
+      o += 50;
+    }
+  }
+  return buf;
+}
+
+// 依存なしのアイソメ・プレビュー(上・右・前の3面を陰影付きで描画)
+function drawPreview(tray){
+  const cv = $('prev'), ctx = cv.getContext('2d');
+  const DPR = Math.min(window.devicePixelRatio || 1, 2);
+  const W = cv.clientWidth || 400, H = cv.clientHeight || 230;
+  cv.width = W * DPR; cv.height = H * DPR;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  const boxes = tray.boxes;
+  if (!boxes.length) return;
+
+  const cos = 0.866, sin = 0.5;
+  const proj = (x, y, z) => ({ sx: (x - y) * cos, sy: (x + y) * sin - z });
+  let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9;
+  for (const b of boxes)
+    for (const P of [[b.x0,b.y0,b.z0],[b.x1,b.y0,b.z0],[b.x1,b.y1,b.z0],[b.x0,b.y1,b.z0],
+                     [b.x0,b.y0,b.z1],[b.x1,b.y0,b.z1],[b.x1,b.y1,b.z1],[b.x0,b.y1,b.z1]]){
+      const s = proj(P[0], P[1], P[2]);
+      if (s.sx < minX) minX = s.sx; if (s.sx > maxX) maxX = s.sx;
+      if (s.sy < minY) minY = s.sy; if (s.sy > maxY) maxY = s.sy;
+    }
+  const pad = 18;
+  const sc = Math.min((W - 2*pad) / (maxX - minX || 1), (H - 2*pad) / (maxY - minY || 1));
+  const ox = (W - (maxX + minX) * sc) / 2, oy = (H - (maxY + minY) * sc) / 2;
+  const S = (x, y, z) => { const s = proj(x, y, z); return [s.sx * sc + ox, s.sy * sc + oy]; };
+
+  const COL = { floor: ['#3a4763','#2c374e','#242e42'], wall: ['#6cc5ff','#3fb6ff','#2b7fc4'] };
+  const face = (pts, fill) => {
+    ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+    ctx.closePath();
+    ctx.fillStyle = fill; ctx.fill();
+    ctx.strokeStyle = 'rgba(4,8,14,.45)'; ctx.lineWidth = 1; ctx.stroke();
+  };
+  const sorted = boxes.slice().sort((a, b) => (a.x0 + a.y0 - a.z1) - (b.x0 + b.y0 - b.z1));  // 奥→手前
+  for (const b of sorted){
+    const col = COL[b.t] || COL.wall;
+    face([S(b.x1,b.y0,b.z0), S(b.x1,b.y1,b.z0), S(b.x1,b.y1,b.z1), S(b.x1,b.y0,b.z1)], col[1]); // 右
+    face([S(b.x0,b.y1,b.z0), S(b.x1,b.y1,b.z0), S(b.x1,b.y1,b.z1), S(b.x0,b.y1,b.z1)], col[2]); // 前
+    face([S(b.x0,b.y0,b.z1), S(b.x1,b.y0,b.z1), S(b.x1,b.y1,b.z1), S(b.x0,b.y1,b.z1)], col[0]); // 上
+  }
+}
+
+function setSeg(id, val){
+  document.querySelectorAll('#' + id + ' button').forEach(b => b.classList.toggle('on', b.dataset.v === val));
+}
+function refreshPrint(){
+  if (selId == null && printOpts.scope === 'sel') printOpts.scope = 'all';
+  $('scopeRow').hidden = (selId == null);
+  setSeg('scopeSeg', printOpts.scope);
+  setSeg('baseSeg', printOpts.base);
+  setSeg('heightSeg', printOpts.height);
+
+  const tray = buildTray();
+  lastTray = tray;
+  const empty = tray.boxes.length === 0;
+  $('prev').hidden = empty; $('prevEmpty').hidden = !empty;
+  if (empty){
+    $('prevEmpty').textContent = printItems().length
+      ? '生成できませんでした。サイズやすき間を見直してください。'
+      : 'アイテムを追加すると、仕切りトレーを作れます。';
+    $('pmeta').innerHTML = '';
+    $('pmDownload').disabled = true;
+    return;
+  }
+  $('pmDownload').disabled = false;
+  drawPreview(tray);
+  const tris = tray.boxes.length * 12;
+  $('pmeta').innerHTML =
+    `<span>サイズ <b>${tray.dims.w}×${tray.dims.d}×${tray.dims.h}</b>mm</span>` +
+    `<span>仕切り <b>${tray.pockets}</b>個</span>` +
+    `<span>三角形 <b>${tris.toLocaleString()}</b></span>` +
+    (tray.overlap ? `<span class="warn">⚠ 仕切りが重なっています</span>` : '');
+}
+function openPrint(){
+  $('pWall').value = printOpts.wall;
+  $('pFloor').value = printOpts.floor;
+  $('pClear').value = printOpts.clear;
+  $('printModalBack').hidden = false;
+  refreshPrint();
+}
+function closePrint(){ $('printModalBack').hidden = true; }
+$('openPrint').onclick = openPrint;
+$('pmCancel').onclick = closePrint;
+$('printModalBack').addEventListener('click', e => { if (e.target === $('printModalBack')) closePrint(); });
+for (const [id, key] of [['scopeSeg','scope'], ['baseSeg','base'], ['heightSeg','height']]){
+  $(id).addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    printOpts[key] = b.dataset.v; refreshPrint();
+  });
+}
+for (const [id, key, lo, hi] of [['pWall','wall',0.4,20], ['pFloor','floor',0.4,40], ['pClear','clear',0,20]]){
+  $(id).addEventListener('input', () => { printOpts[key] = clampN($(id).value, lo, hi); refreshPrint(); });
+}
+$('pmDownload').onclick = () => {
+  const tray = (lastTray && lastTray.boxes.length) ? lastTray : buildTray();
+  if (!tray.boxes.length) return;
+  const buf = boxesToSTL(tray.boxes);
+  const base = (curDrawer().name || 'drawer').replace(/[^\w\-一-龠ぁ-んァ-ヶー]+/g, '_').replace(/^_+|_+$/g, '') || 'drawer';
+  const blob = new Blob([buf], { type: 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `${base}_tray.stl`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+};
+
 /* ===================== その他 ===================== */
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape'){
-    if (!$('itemModalBack').hidden) closeItemModal();
+    if (!$('printModalBack').hidden) closePrint();
+    else if (!$('itemModalBack').hidden) closeItemModal();
     else if (!$('drawerModalBack').hidden) closeDrawerModal();
     else if (!$('sheet').hidden) closeSheet();
     else if (selId != null){ selId = null; renderCanvas(); renderSel(); }
