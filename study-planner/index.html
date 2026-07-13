@@ -156,6 +156,10 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 .tbook .rest{font-size:12.5px;color:var(--sub);margin-top:10px}
 .tbook .doneline{font-size:13px;color:var(--ok);font-weight:700;margin-top:11px;display:flex;align-items:center;gap:6px}
+.pace{font-size:12px;color:var(--sub);margin-top:10px;line-height:1.5}
+.pace b{color:var(--accent);font-size:13.5px;font-variant-numeric:tabular-nums}
+.pace .up{color:var(--warn);font-weight:700}
+.pace .dn{color:var(--ok);font-weight:700}
 
 /* ---- 計画タブ ---- */
 .pbook{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:11px;cursor:pointer}
@@ -268,21 +272,6 @@ a{color:var(--accent)}
 .toast.on{opacity:1;transform:translateX(-50%) translateY(-4px)}
 .toast.err{border-color:var(--err);color:var(--err)}
 .toast.ok{border-color:var(--ok)}
-
-/* ---- テストモード ---- */
-#testBanner{
-  background:var(--warn-dim);border:1px solid var(--warn);border-radius:12px;
-  padding:10px 12px;margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
-}
-#testBanner .txt{font-size:12.5px;color:var(--warn);font-weight:700;flex:1;min-width:0;line-height:1.5}
-#testBanner .txt b{color:var(--text)}
-#testBanner button{background:var(--warn);color:#241a00;border:none;border-radius:8px;padding:8px 12px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap}
-header .badge.test{color:#241a00;background:var(--warn);border-color:var(--warn)}
-.tgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
-.tgrid .btn{padding:10px 6px;font-size:12.5px}
-#testPanel .today-now{font-size:13px;color:var(--sub);margin:2px 0 10px}
-#testPanel .today-now b{color:var(--warn);font-size:17px;font-variant-numeric:tabular-nums}
-#testPanel h4{font-size:12px;color:var(--sub);font-weight:700;margin:16px 0 2px}
 </style>
 </head>
 <body>
@@ -293,7 +282,6 @@ header .badge.test{color:#241a00;background:var(--warn);border-color:var(--warn)
 </header>
 
 <main>
-  <div id="testBanner" hidden></div>
   <!-- 今日 -->
   <section class="view on" id="v-today">
     <div id="todayHero"></div>
@@ -332,10 +320,6 @@ header .badge.test{color:#241a00;background:var(--warn);border-color:var(--warn)
 
   <!-- 設定 -->
   <section class="view" id="v-settings">
-    <div class="card" id="testCard">
-      <div class="lbl">🧪 テストモード(動作確認用)</div>
-      <div id="testPanel"></div>
-    </div>
     <div class="card">
       <div class="lbl">🐙 GitHub同期(クラウドバックアップ)</div>
       <p class="small" style="margin-bottom:12px">
@@ -520,37 +504,23 @@ const SUBJ_COLORS = {'英語':'#3fb950','数学':'#3fb6ff','国語':'#ff7b72','�
 const subjColor = s => SUBJ_COLORS[s] || '#7d8aa0';
 
 /* ===================== 状態(localStorage) ===================== */
-const LS_KEY = 'studyPlanner.v1';       // 本番データ
-const TEST_KEY = 'studyPlanner.test';   // テスト用サンドボックス
-const SESSION_KEY = 'studyPlanner.session'; // どちらを使っているか等の小さなポインタ
-let ACTIVE_KEY = LS_KEY;                 // いま読み書きしている領域
-let FAKE_TODAY = null;                   // テスト用の「仮の今日」(YYYY-MM-DD) / null=実際の今日
-const isTestMode = () => ACTIVE_KEY === TEST_KEY;
+const LS_KEY = 'studyPlanner.v1';
+// 旧「テストモード」の残骸があれば掃除(この機能は廃止しました)
+try { localStorage.removeItem('studyPlanner.test'); localStorage.removeItem('studyPlanner.session'); } catch (e) {}
 
-function normalizeState(raw) {
-  let s = { books: [], logs: {}, settings: {}, timer: null };
-  if (raw && typeof raw === 'object') s = Object.assign(s, raw);
-  s.books = s.books || [];
-  s.logs = s.logs || {};
-  s.settings = Object.assign({ github: {}, defaultRest: [] }, s.settings || {});
-  s.settings.github = s.settings.github || {};
-  return s;
-}
-function loadStore(key) { try { return normalizeState(JSON.parse(localStorage.getItem(key))); } catch (e) { return normalizeState(null); } }
-
-let state = normalizeState(null);
-// セッション(テストモードか)を復元してから、対応する領域を読み込む
-(function initSession() {
-  let sess = {}; try { sess = JSON.parse(localStorage.getItem(SESSION_KEY)) || {}; } catch (e) {}
-  if (sess.mode === 'test') { ACTIVE_KEY = TEST_KEY; FAKE_TODAY = sess.fakeToday || null; }
-  state = loadStore(ACTIVE_KEY);
-})();
-function saveSession() { try { localStorage.setItem(SESSION_KEY, JSON.stringify({ mode: isTestMode() ? 'test' : 'real', fakeToday: FAKE_TODAY })); } catch (e) {} }
+let state = { books: [], logs: {}, settings: {}, timer: null };
+try {
+  const raw = JSON.parse(localStorage.getItem(LS_KEY));
+  if (raw && typeof raw === 'object') state = Object.assign(state, raw);
+} catch (e) {}
+state.books = state.books || [];
+state.logs = state.logs || {};
+state.settings = Object.assign({ github: {}, defaultRest: [] }, state.settings || {});
+state.settings.github = state.settings.github || {};
 
 function save(sync = true) {
-  try { localStorage.setItem(ACTIVE_KEY, JSON.stringify(state)); } catch (e) { toast('保存に失敗(容量不足かも)', 'err'); }
-  // テスト中は本番のGistを汚さないよう自動同期しない
-  if (sync && !isTestMode() && state.settings.github.autoSync && state.settings.github.token) scheduleAutoSync();
+  try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) { toast('保存に失敗(容量不足かも)', 'err'); }
+  if (sync && state.settings.github.autoSync && state.settings.github.token) scheduleAutoSync();
 }
 const bookById = id => state.books.find(b => b.id === id);
 
@@ -600,8 +570,7 @@ const blobToDataURL = blob => new Promise(res => { const fr = new FileReader(); 
 
 /* ===================== 日付ヘルパー ===================== */
 const dayKey = d => (d || new Date()).toLocaleDateString('sv'); // YYYY-MM-DD(ローカル)
-const realToday = () => dayKey();
-const todayKey = () => FAKE_TODAY || dayKey(); // テスト中は仮の今日を返す
+const todayKey = () => dayKey();
 function keyToDate(k) { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); }
 function addDaysKey(k, n) { const d = keyToDate(k); d.setDate(d.getDate() + n); return dayKey(d); }
 const fmtMD = k => { const d = keyToDate(k); return (d.getMonth() + 1) + '/' + d.getDate(); };
@@ -672,7 +641,8 @@ function calcBook(book) {
 
   const r = { total, done, doneBefore, remainingStart, remainingNow, dToday, dTodayMin, pct, timePerUnit, calToDeadline,
     finished: remainingNow <= 0, overdue: false, todayIsStudy, daysLeft: 0, perDay: 0, targetToday: 0, remainToday: 0,
-    targetMinToday: null, status: 'ontrack', origPerDay: 0, actualPerDay: 0, projFinishKey: null, projDiffDays: null };
+    targetMinToday: null, status: 'ontrack', origPerDay: 0, actualPerDay: 0, projFinishKey: null, projDiffDays: null,
+    reqPerDay: 0, reqMinPerDay: null, origMinPerDay: null };
 
   if (r.finished) { r.status = 'done'; return r; }
   if (!book.deadline) { r.status = 'nodl'; r.targetToday = 0; return r; }
@@ -709,6 +679,13 @@ function calcBook(book) {
   else if (r.perDay > 0 && r.perDay < r.origPerDay * 0.92) r.status = 'ahead';
   else r.status = 'ontrack';
 
+  // 予定どおり終えるために「今日から毎日」必要な量・時間(サボり分は自動で上乗せ)
+  r.reqPerDay = daysLeft > 0 ? remainingStart / daysLeft : remainingNow;
+  if (timePerUnit) {
+    r.reqMinPerDay = Math.round(r.reqPerDay * timePerUnit);
+    r.origMinPerDay = Math.round(r.origPerDay * timePerUnit);
+  }
+
   // 実績ペースからの完了予測
   const elapsed = Math.max(1, studyDaysBetween(book, startK, today));
   const doneSince = done - (book.startDone || 0);
@@ -729,6 +706,23 @@ function fmtMin(min) {
   return h + '<small>時間</small>' + (m ? m + '<small>分</small>' : '');
 }
 function fmtMinShort(min) { if (min >= 60) { const h = min / 60; return (h >= 10 ? Math.round(h) : Math.round(h * 10) / 10) + 'h'; } return Math.round(min) + 'm'; }
+// プレーン表記(2時間10分 / 45分)
+function fmtHM(min) { min = Math.max(0, Math.round(min)); if (min < 60) return min + '分'; const h = Math.floor(min / 60), m = min % 60; return h + '時間' + (m ? m + '分' : ''); }
+// 「予定どおり終えるには 今日から毎日 ◯」ヒント(サボり反映後の必要ペース)
+function paceHint(c, unit) {
+  if (c.finished || c.status === 'nodl') return '';
+  let main;
+  if (c.overdue) main = '今すぐ残り <b>' + c.remainingNow + esc(unit) + '</b> を仕上げよう';
+  else if (c.reqMinPerDay != null) main = '予定どおり終えるには 今日から毎日 <b>' + fmtHM(c.reqMinPerDay) + '</b>';
+  else main = '予定どおり終えるには 今日から毎日 <b>' + Math.max(1, Math.ceil(c.reqPerDay)) + esc(unit) + '</b>';
+  let extra = '';
+  if (!c.overdue && c.status === 'behind') {
+    extra = (c.origMinPerDay != null) ? ' <span class="up">↑ サボる前は ' + fmtHM(c.origMinPerDay) + '</span>' : ' <span class="up">↑ 遅れ気味</span>';
+  } else if (!c.overdue && c.status === 'ahead') {
+    extra = ' <span class="dn">前倒し中</span>';
+  }
+  return '<div class="pace">📈 ' + main + extra + '</div>';
+}
 
 /* ===================== トースト ===================== */
 let toastT = null;
@@ -781,7 +775,7 @@ function renderView(v) {
   else if (v === 'stats') renderStats();
   else if (v === 'settings') renderSettings();
 }
-function renderAll() { renderBanner(); renderBadges(); renderView(curView); }
+function renderAll() { renderBadges(); renderView(curView); }
 
 /* 連続記録: 1分以上勉強した日が続いている数 */
 function calcStreak() {
@@ -793,9 +787,7 @@ function calcStreak() {
   return streak;
 }
 function renderBadges() {
-  const sb = $('streakBadge');
-  sb.classList.toggle('test', isTestMode());
-  sb.textContent = isTestMode() ? '🧪 テスト中' : '🔥 ' + calcStreak() + '日';
+  $('streakBadge').textContent = '🔥 ' + calcStreak() + '日';
   const active = state.books.filter(b => !b.archived);
   let todo = 0, behind = 0;
   active.forEach(b => { const c = calcBook(b); if (!c.finished && c.remainToday > 0) todo++; if (c.status === 'behind' || c.status === 'over') behind++; });
@@ -823,13 +815,24 @@ async function renderToday() {
   }
 
   const calcs = active.map(b => ({ b, c: calcBook(b) }));
-  let totalMin = 0, totalTargetMin = 0, remainBooks = 0;
-  calcs.forEach(({ b, c }) => { totalMin += c.dTodayMin; if (!c.finished) { if (c.targetMinToday) totalTargetMin += c.targetMinToday; if (c.remainToday > 0) remainBooks++; } });
+  let totalMin = 0, totalTargetMin = 0, remainBooks = 0, behindCount = 0, totalReqMin = 0, reqKnown = false;
+  calcs.forEach(({ b, c }) => {
+    totalMin += c.dTodayMin;
+    if (!c.finished) {
+      if (c.targetMinToday) totalTargetMin += c.targetMinToday;
+      if (c.remainToday > 0) remainBooks++;
+      if (c.status === 'behind' || c.status === 'over') behindCount++;
+      if (c.reqMinPerDay != null) { totalReqMin += c.reqMinPerDay; reqKnown = true; }
+    }
+  });
   const doneMinAll = totalMin;
 
   let msg;
   if (remainBooks === 0) msg = '🎉 今日のノルマは全部クリア!おつかれさま。';
-  else if (doneMinAll === 0) msg = 'さあ始めよう。今日やる分は下のリストの通り。';
+  else if (behindCount > 0) {
+    msg = '⚠️ サボった分を上乗せしました。' +
+      (reqKnown ? '予定どおり終えるには、今日から毎日 <b style="color:var(--warn)">' + fmtHM(totalReqMin) + '</b> ずつ。' : '遅れを取り戻すペースに増えています。');
+  } else if (doneMinAll === 0) msg = 'さあ始めよう。今日やる分は下のリストの通り。';
   else msg = 'あと ' + remainBooks + '冊。この調子!';
 
   hero.innerHTML =
@@ -865,6 +868,7 @@ function todayCard(b, c) {
   } else if (!c.todayIsStudy && c.status !== 'over') {
     const dtl = c.dToday > 0 ? '(今日 ' + c.dToday + esc(b.unit || '') + '・' + Math.round(c.dTodayMin) + '分)' : '';
     body = '<div class="rest">💤 今日は休養日。やる場合は「記入」から記録できます。' + dtl + '</div>' +
+      paceHint(c, b.unit || '') +
       '<div class="acts"><button class="btn sm ghost" onclick="openLogSheet(\'' + b.id + '\')">記入</button>' + timerBtn(b, running) + '</div>';
   } else {
     const met = c.remainToday <= 0;
@@ -885,7 +889,7 @@ function todayCard(b, c) {
         '<button class="btn sm" onclick="openLogSheet(\'' + b.id + '\')">✎ 記入</button>' +
         timerBtn(b, running) + '</div>';
     }
-    body = goal + prog + acts;
+    body = goal + prog + paceHint(c, b.unit || '') + acts;
   }
   return '<div class="tbook ' + cls + '" data-b="' + b.id + '">' +
     '<div class="top"><span class="dot" style="background:' + subjColor(b.subject) + '"></span>' +
@@ -996,10 +1000,11 @@ function planCard(b, c) {
     '<div class="prog"><div class="pbar" style="flex:1"><span class="b" style="width:' + c.pct + '%;background:' + subjColor(b.subject) + '"></span></div>' +
     '<span class="pv">' + Math.round(c.pct) + '%</span></div>' +
     '<div class="meta">' +
-    '<div class="m">1日のノルマ<b class="acc">' + perDayTxt + '</b></div>' +
+    '<div class="m">1日のノルマ<b class="acc">' + perDayTxt + '</b>' +
+      (!c.finished && c.status !== 'nodl' && c.reqMinPerDay != null ? '<span class="sub2">≈' + fmtHM(c.reqMinPerDay) + '/日</span>' : '') + '</div>' +
     '<div class="m">締切<b>' + dlMain + '</b><span class="sub2 ' + dlSubCls + '">' + dlSub + '</span></div>' +
     '<div class="m">完了予測<b class="' + projCls + '">' + projMain + '</b><span class="sub2">' + projSub + '</span></div>' +
-    '</div>' + burndown(b, c) + '</div>';
+    '</div>' + paceHint(c, b.unit || '') + burndown(b, c) + '</div>';
 }
 // バーンダウン(残量)スパークライン
 function burndown(b, c) {
@@ -1204,7 +1209,6 @@ function renderSettings() {
   $('ghAuto').classList.toggle('on', !!g.autoSync);
   $('defRest').innerHTML = WD.map((w, i) => '<span class="chip' + ((state.settings.defaultRest || []).includes(i) ? ' on' : '') + '" data-w="' + i + '">' + w + '</span>').join('');
   updateSyncStatus();
-  renderTestPanel();
 }
 function updateSyncStatus() {
   const g = state.settings.github; const s = $('syncStatus');
@@ -1255,7 +1259,6 @@ $('impFile').onchange = async e => {
   } catch (err) { toast('読み込めません: ' + err.message, 'err'); }
 };
 $('wipeBtn').onclick = async () => {
-  if (isTestMode()) { clearSandbox(); return; } // テスト中はサンドボックスだけ(本番・写真は無事)
   if (!confirm('参考書・記録・写真をすべて削除します。よろしいですか?')) return;
   if (!confirm('本当に削除しますか?この操作は取り消せません。')) return;
   state.books = []; state.logs = {}; state.timer = null; stopTick();
@@ -1267,7 +1270,6 @@ $('wipeBtn').onclick = async () => {
 const GIST_FILE = 'study-planner-data.json';
 function ghHeaders(token) { return { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }; }
 async function githubUpload(quiet) {
-  if (isTestMode()) { if (!quiet) toast('テスト中はGitHub同期しません', 'err'); return; }
   const g = state.settings.github; const token = (g.token || '').trim();
   if (!token) { if (!quiet) toast('トークンを入れてね', 'err'); return; }
   if (!quiet) toast('同期中…');
@@ -1287,7 +1289,6 @@ async function githubUpload(quiet) {
   } catch (err) { toast('同期エラー: ' + err.message, 'err'); }
 }
 async function githubDownload() {
-  if (isTestMode()) { toast('テスト中はGitHub同期しません', 'err'); return; }
   const g = state.settings.github; const token = (g.token || '').trim();
   if (!token) { toast('トークンを入れてね', 'err'); return; }
   if (!g.gistId) { toast('Gist IDが必要です', 'err'); return; }
@@ -1313,170 +1314,6 @@ function scheduleAutoSync() { clearTimeout(autoSyncTimer); autoSyncTimer = setTi
 $('ghUp').onclick = () => { state.settings.github.token = $('ghToken').value.trim(); state.settings.github.gistId = $('ghGist').value.trim(); githubUpload(false); };
 $('ghDown').onclick = () => { state.settings.github.token = $('ghToken').value.trim(); state.settings.github.gistId = $('ghGist').value.trim(); githubDownload(); };
 
-/* ===================== テストモード ===================== */
-function renderBanner() {
-  const el = $('testBanner');
-  if (!isTestMode()) { el.hidden = true; return; }
-  el.hidden = false;
-  const real = realToday();
-  const fake = todayKey();
-  const diff = calDaysBetween(real, fake);
-  const diffTxt = diff === 0 ? '実際の今日' : (diff > 0 ? '実際より' + diff + '日先' : '実際より' + Math.abs(diff) + '日前');
-  el.innerHTML = '<span class="txt">🧪 テストモード中 ・ 仮の今日 <b>' + fmtMD(fake) + '(' + WD[keyToDate(fake).getDay()] + ')</b> <span style="opacity:.8">(' + diffTxt + ')</span> ・ 本番データは安全です</span>' +
-    '<button id="bannerExit">本番に戻る</button>';
-  $('bannerExit').onclick = exitTestMode;
-}
-
-function enterTestMode() {
-  const seeded = localStorage.getItem(TEST_KEY);
-  save(false);              // 本番を確定保存
-  ACTIVE_KEY = TEST_KEY;
-  if (state.timer) stopTick();
-  if (!seeded) {            // 初回は本番のコピーで種まき(トークンは持ち込まない)
-    state = normalizeState(JSON.parse(JSON.stringify(loadStore(LS_KEY))));
-    state.settings.github = {};
-    state.timer = null;
-  } else {
-    state = loadStore(TEST_KEY);
-  }
-  FAKE_TODAY = FAKE_TODAY || realToday();
-  saveSession(); save(false);
-  if (state.timer) ensureTick();
-  renderAll(); toast('🧪 テストモードに入りました', 'ok');
-}
-function exitTestMode() {
-  save(false);              // サンドボックスを保存
-  ACTIVE_KEY = LS_KEY; FAKE_TODAY = null;
-  if (state.timer) stopTick();
-  state = loadStore(LS_KEY);
-  saveSession();
-  if (state.timer) ensureTick();
-  renderAll(); showView(curView); toast('本番データに戻りました', 'ok');
-}
-function copyRealIntoSandbox() {
-  if (!isTestMode()) return;
-  if (!confirm('本番データの最新コピーでサンドボックスを作り直しますか?\n(今のテスト内容は消えます)')) return;
-  const copy = normalizeState(JSON.parse(JSON.stringify(loadStore(LS_KEY))));
-  copy.settings.github = {}; copy.timer = null;
-  state = copy; stopTick();
-  save(false); renderAll(); toast('本番データをコピーしました', 'ok');
-}
-// テストデータをまっさらに(テストモードは継続。本番は無事)
-function clearSandbox() {
-  if (!isTestMode()) return;
-  if (!confirm('テスト用のデータをまっさらに消しますか?\n(本番データは消えません)')) return;
-  state.books = []; state.logs = {}; state.timer = null; stopTick();
-  save(false); renderAll(); toast('テストをまっさらにしました', 'ok');
-}
-// テストを終了し、サンドボックスを丸ごと削除して痕跡を残さない
-function discardTestAndExit() {
-  if (!isTestMode()) return;
-  if (!confirm('テストデータを完全に削除して本番に戻りますか?\n(次に入るときは本番のコピーから作り直します)')) return;
-  if (state.timer) stopTick();
-  ACTIVE_KEY = LS_KEY; FAKE_TODAY = null;
-  try { localStorage.removeItem(TEST_KEY); } catch (e) {}
-  state = loadStore(LS_KEY);
-  saveSession();
-  if (state.timer) ensureTick();
-  renderAll(); showView(curView); toast('テストデータを削除しました', 'ok');
-}
-
-/* 仮の今日を操作 */
-function setFakeToday(k) { if (!isTestMode()) return; FAKE_TODAY = k || realToday(); saveSession(); renderAll(); }
-function shiftFakeToday(n) { if (!isTestMode()) return; FAKE_TODAY = addDaysKey(todayKey(), n); saveSession(); renderAll(); }
-
-/* ---- サンプルデータ ---- */
-function addBook(o) {
-  const b = Object.assign({ id: uid(), createdAt: Date.now(), startDate: todayKey(), weekdays: [0, 1, 2, 3, 4, 5, 6], startDone: 0, unit: 'ページ' }, o);
-  state.books.push(b); return b;
-}
-function addLog(k, id, u, m) { (state.logs[k] || (state.logs[k] = {}))[id] = { u, m, note: '' }; }
-function seed3Subjects() {
-  const t = todayKey();
-  const eng = addBook({ name: 'システム英単語', subject: '英語', unit: '単語', total: 2000, startDate: addDaysKey(t, -20), deadline: addDaysKey(t, 90), startDone: 300, paceUnits: 50, paceMin: 30 });
-  const math = addBook({ name: '青チャート数学ⅠA', subject: '数学', unit: '問', total: 300, startDate: addDaysKey(t, -20), deadline: addDaysKey(t, 120), paceUnits: 5, paceMin: 40 });
-  const kobun = addBook({ name: '古文単語315', subject: '国語', unit: '単語', total: 315, startDate: addDaysKey(t, -10), deadline: addDaysKey(t, 60) });
-  // 直近2週間の実績(それっぽく)
-  for (let i = 14; i >= 1; i--) {
-    const k = addDaysKey(t, -i);
-    if (Math.random() < 0.8) addLog(k, eng.id, 20 + Math.floor(Math.random() * 25), 15 + Math.floor(Math.random() * 30));
-    if (Math.random() < 0.6) addLog(k, math.id, 2 + Math.floor(Math.random() * 4), 30 + Math.floor(Math.random() * 40));
-    if (Math.random() < 0.5) { const cur = state.logs[k] && state.logs[k][kobun.id]; addLog(k, kobun.id, 8 + Math.floor(Math.random() * 10), 10 + Math.floor(Math.random() * 15)); }
-  }
-  save(); renderAll(); toast('3科目セットを追加', 'ok');
-}
-function seedBehind() {
-  const t = todayKey();
-  const b = addBook({ name: '【遅れ例】英文法ポラリス', subject: '英語', unit: '問', total: 500, startDate: addDaysKey(t, -25), deadline: addDaysKey(t, 10), startDone: 0, paceUnits: 10, paceMin: 20 });
-  // ほとんど手をつけていない(=大幅に遅れ、ノルマが跳ね上がる)
-  addLog(addDaysKey(t, -3), b.id, 12, 25);
-  save(); renderAll(); toast('サボり(遅れ)例を追加', 'ok');
-}
-function seedAhead() {
-  const t = todayKey();
-  const b = addBook({ name: '【前倒し例】速読英熟語', subject: '英語', unit: '章', total: 50, startDate: addDaysKey(t, -20), deadline: addDaysKey(t, 60), paceUnits: 1, paceMin: 25 });
-  for (let i = 20; i >= 1; i--) if (Math.random() < 0.85) addLog(addDaysKey(t, -i), b.id, 1 + Math.floor(Math.random() * 2), 20 + Math.floor(Math.random() * 20));
-  save(); renderAll(); toast('前倒し例を追加', 'ok');
-}
-function seedManyLogs() {
-  const t = todayKey();
-  let target = state.books.find(b => !b.archived);
-  if (!target) target = addBook({ name: '【記録例】一問一答', subject: '社会', unit: '問', total: 1500, startDate: addDaysKey(t, -70), deadline: addDaysKey(t, 60) });
-  for (let i = 70; i >= 0; i--) if (Math.random() < 0.7) { const k = addDaysKey(t, -i); addLog(k, target.id, 10 + Math.floor(Math.random() * 40), 20 + Math.floor(Math.random() * 70)); }
-  save(); renderAll(); toast('約70日分の記録を追加(グラフ/ヒートマップ用)', 'ok');
-}
-
-function renderTestPanel() {
-  const p = $('testPanel');
-  if (!isTestMode()) {
-    p.innerHTML = '<p class="small" style="margin-bottom:12px">本番データ(いま入っている参考書・記録)は<b style="color:var(--text)">そのまま安全に残したまま</b>、' +
-      'コピーを使って「仮の今日」を前後に動かしたり、サンプルデータを入れて逆算やグラフの挙動を試せます。' +
-      'テスト中はGitHub同期を止めるので、本番のバックアップも汚しません。</p>' +
-      '<button class="btn pri block" id="tEnter">🧪 テストモードに入る(今のデータをコピー)</button>';
-    $('tEnter').onclick = enterTestMode;
-    return;
-  }
-  const t = todayKey();
-  p.innerHTML =
-    '<div class="today-now">仮の今日: <b>' + fmtMD(t) + '(' + WD[keyToDate(t).getDay()] + ')</b></div>' +
-    '<input type="date" id="tDate" value="' + t + '">' +
-    '<div class="tgrid">' +
-      '<button class="btn" data-shift="-7">◀ 1週間</button>' +
-      '<button class="btn" data-shift="-1">◀ 1日</button>' +
-      '<button class="btn" data-shift="1">1日 ▶</button>' +
-      '<button class="btn" data-shift="7">1週間 ▶</button>' +
-      '<button class="btn" data-shift="30">1ヶ月 ▶</button>' +
-      '<button class="btn ghost" id="tResetDay">実際の今日</button>' +
-    '</div>' +
-    '<h4>サンプルデータを追加</h4>' +
-    '<div class="tgrid">' +
-      '<button class="btn" id="tSeed3">3科目セット</button>' +
-      '<button class="btn" id="tSeedBehind">サボり例</button>' +
-      '<button class="btn" id="tSeedAhead">前倒し例</button>' +
-      '<button class="btn" id="tSeedMany">大量の記録</button>' +
-    '</div>' +
-    '<h4>リセット / 終了</h4>' +
-    '<div class="tgrid">' +
-      '<button class="btn danger" id="tClear">🧹 まっさらに消す</button>' +
-      '<button class="btn" id="tRecopy">実データを再コピー</button>' +
-      '<button class="btn danger" id="tDiscard">🗑 全消去して終了</button>' +
-    '</div>' +
-    '<button class="btn pri block" id="tExit" style="margin-top:9px">本番に戻る(テストは残す)</button>' +
-    '<div class="hint" style="margin-top:8px">「まっさらに消す」= テストの中身だけ空に(すぐ実験を作り直せる)。' +
-    '「全消去して終了」= テストデータを丸ごと削除して本番へ。どちらも<b>本番データは無事</b>です。</div>';
-  $('tDate').onchange = e => setFakeToday(e.target.value);
-  p.querySelectorAll('[data-shift]').forEach(b => b.onclick = () => shiftFakeToday(parseInt(b.dataset.shift)));
-  $('tResetDay').onclick = () => setFakeToday(null);
-  $('tSeed3').onclick = seed3Subjects;
-  $('tSeedBehind').onclick = seedBehind;
-  $('tSeedAhead').onclick = seedAhead;
-  $('tSeedMany').onclick = seedManyLogs;
-  $('tClear').onclick = clearSandbox;
-  $('tRecopy').onclick = copyRealIntoSandbox;
-  $('tDiscard').onclick = discardTestAndExit;
-  $('tExit').onclick = exitTestMode;
-}
-
 /* ===================== 可視性 ===================== */
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { if (state.timer) ensureTick(); if (curView === 'today') renderToday(); } });
 
@@ -1484,7 +1321,6 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 (async function init() {
   try { await openDB(); } catch (e) {}
   showView('today');
-  renderBanner();
   renderBadges();
   if (state.timer) ensureTick();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
