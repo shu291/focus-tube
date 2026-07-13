@@ -1,0 +1,1288 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="逆算プランナー">
+<meta name="theme-color" content="#0d1117">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="../icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" sizes="180x180" href="../apple-touch-icon.png">
+<title>逆算プランナー · 参考書スケジュール</title>
+<style>
+:root{
+  --bg:#0d1117; --panel:#161b22; --panel2:#1c2330; --line:#2a3344;
+  --text:#e6edf3; --sub:#8b97a8; --accent:#3fb6ff; --accent-dim:rgba(63,182,255,.14);
+  --ok:#3fb950; --ok-dim:rgba(63,185,80,.14); --warn:#d29922; --warn-dim:rgba(210,153,34,.15);
+  --err:#ff7b72; --err-dim:rgba(255,123,114,.14); --purple:#a371f7;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;
+  min-height:100vh; padding-bottom:calc(76px + env(safe-area-inset-bottom));
+  -webkit-text-size-adjust:100%;
+}
+header{
+  position:sticky;top:0;z-index:10;
+  background:rgba(13,17,23,.92); backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--line);
+  padding:calc(12px + env(safe-area-inset-top)) 16px 12px;
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+}
+header h1{font-size:17px;font-weight:700;letter-spacing:.02em}
+header h1 span{color:var(--accent)}
+header .badge{font-size:12px;color:var(--warn);border:1px solid var(--line);border-radius:8px;padding:5px 10px;white-space:nowrap;font-variant-numeric:tabular-nums}
+
+main{max-width:680px;margin:0 auto;padding:14px 16px 24px}
+.view{display:none}
+.view.on{display:block;animation:fade .2s}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* ---- 下タブ ---- */
+nav{
+  position:fixed;bottom:0;left:0;right:0;z-index:20;
+  background:rgba(13,17,23,.96);backdrop-filter:blur(12px);
+  border-top:1px solid var(--line);
+  display:flex;max-width:680px;margin:0 auto;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+nav button{
+  flex:1;background:none;border:none;color:var(--sub);cursor:pointer;
+  padding:9px 0 7px;font-size:10.5px;font-weight:600;position:relative;
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+}
+nav button .ic{font-size:20px;line-height:1}
+nav button.on{color:var(--accent)}
+nav button .cnt{
+  position:absolute;top:4px;left:50%;transform:translateX(6px);
+  background:var(--err);color:#fff;font-size:10px;font-weight:700;
+  min-width:16px;height:16px;border-radius:8px;padding:0 4px;
+  display:flex;align-items:center;justify-content:center;
+}
+
+/* ---- 共通部品 ---- */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:15px;margin-top:12px}
+.card:first-child{margin-top:0}
+.card .lbl{font-size:11px;color:var(--sub);letter-spacing:.04em;margin-bottom:10px;font-weight:600}
+.field{margin-top:13px}
+.field:first-child{margin-top:0}
+.field label{display:block;font-size:12px;color:var(--sub);margin-bottom:6px;font-weight:600}
+input[type=text],input[type=number],input[type=search],input[type=date],input[type=password],textarea,select{
+  width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);
+  border-radius:10px;padding:11px 12px;font-size:15px;font-family:inherit;
+  -webkit-appearance:none;appearance:none;
+}
+input[type=date]{min-height:44px}
+textarea{min-height:64px;resize:vertical;line-height:1.6}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
+.row2{display:flex;gap:10px}
+.row2>*{flex:1;min-width:0}
+.hint{font-size:11.5px;color:var(--sub);margin-top:6px;line-height:1.5}
+.btn{
+  background:var(--panel2);color:var(--text);border:1px solid var(--line);
+  border-radius:10px;padding:12px 14px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+}
+.btn:active{background:var(--panel)}
+.btn.pri{background:var(--accent);color:#06121c;border-color:var(--accent);font-weight:700}
+.btn.ok{background:var(--ok);color:#06210d;border-color:var(--ok);font-weight:700}
+.btn.ghost{background:none}
+.btn.danger{color:var(--err);border-color:var(--err)}
+.btn.sm{padding:8px 11px;font-size:13px;border-radius:9px}
+.btn.block{width:100%}
+.btn:disabled{opacity:.45;cursor:default}
+.btnrow{display:flex;gap:9px;margin-top:12px}
+.btnrow>.btn{flex:1}
+
+.chip{
+  background:var(--panel2);border:1px solid var(--line);color:var(--sub);
+  border-radius:20px;padding:7px 13px;font-size:13px;font-weight:600;cursor:pointer;
+}
+.chip.on{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+
+.tag{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:7px}
+.tag.ok{background:var(--ok-dim);color:var(--ok)}
+.tag.warn{background:var(--warn-dim);color:var(--warn)}
+.tag.err{background:var(--err-dim);color:var(--err)}
+.tag.info{background:var(--accent-dim);color:var(--accent)}
+.tag.mute{background:var(--panel2);color:var(--sub)}
+
+.pbar{background:var(--panel2);border-radius:6px;height:9px;overflow:hidden}
+.pbar .b{display:block;height:100%;border-radius:6px;transition:width .35s}
+
+.dot{width:9px;height:9px;border-radius:3px;flex:0 0 auto}
+
+.empty{text-align:center;color:var(--sub);padding:34px 16px}
+.empty .big{font-size:40px;margin-bottom:12px}
+.empty p{font-size:14px;line-height:1.7;margin-bottom:4px}
+
+/* ---- 今日タブ ---- */
+#todayHero{background:linear-gradient(135deg,#182233,#141b26);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:4px}
+#todayHero .date{font-size:12px;color:var(--sub)}
+#todayHero .line{display:flex;align-items:baseline;gap:8px;margin-top:6px;flex-wrap:wrap}
+#todayHero .big{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums}
+#todayHero .big small{font-size:14px;color:var(--sub);font-weight:600;margin:0 1px}
+#todayHero .msg{font-size:12.5px;color:var(--sub);margin-top:9px;line-height:1.6}
+#todayHero .mini{display:flex;gap:16px;margin-top:11px}
+#todayHero .mini div{font-size:11px;color:var(--sub)}
+#todayHero .mini b{display:block;font-size:16px;color:var(--text);font-weight:700;margin-top:2px;font-variant-numeric:tabular-nums}
+#todayHero .mini b.acc{color:var(--accent)}
+#todayHero .mini b.warn{color:var(--warn)}
+
+.tbook{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:11px;position:relative;overflow:hidden}
+.tbook.done{border-color:rgba(63,185,80,.4)}
+.tbook.behind{border-color:rgba(210,153,34,.35)}
+.tbook.over{border-color:rgba(255,123,114,.4)}
+.tbook .top{display:flex;align-items:center;gap:9px}
+.tbook .nm{font-size:15px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tbook .goal{margin-top:11px;display:flex;align-items:baseline;gap:7px;flex-wrap:wrap}
+.tbook .goal .q{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}
+.tbook .goal .u{font-size:13px;color:var(--sub);font-weight:600}
+.tbook .goal .sep{color:var(--line)}
+.tbook .goal .t{font-size:13px;color:var(--accent);font-weight:700}
+.tbook .prog{margin-top:11px;display:flex;align-items:center;gap:9px}
+.tbook .prog .pbar{flex:1}
+.tbook .prog .pv{font-size:11px;color:var(--sub);font-variant-numeric:tabular-nums;min-width:52px;text-align:right}
+.tbook .acts{display:flex;gap:8px;margin-top:12px;align-items:center}
+.tbook .acts .btn{flex:1}
+.tbook .timer{margin-left:auto;font-variant-numeric:tabular-nums}
+.tbook .runbadge{font-size:12px;color:var(--ok);font-weight:700;font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:6px}
+.tbook .runbadge::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--ok);animation:pulse 1.1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.tbook .rest{font-size:12.5px;color:var(--sub);margin-top:10px}
+.tbook .doneline{font-size:13px;color:var(--ok);font-weight:700;margin-top:11px;display:flex;align-items:center;gap:6px}
+
+/* ---- 計画タブ ---- */
+.pbook{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:11px;cursor:pointer}
+.pbook .top{display:flex;align-items:center;gap:9px}
+.pbook .nm{font-size:15px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pbook .sub{font-size:11.5px;color:var(--sub);margin-top:3px}
+.pbook .prog{margin-top:11px;display:flex;align-items:center;gap:9px}
+.pbook .prog .pv{font-size:12px;color:var(--sub);font-variant-numeric:tabular-nums;min-width:78px;text-align:right}
+.pbook .meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:11px}
+.pbook .meta .m{background:var(--panel2);border-radius:8px;padding:7px 10px;font-size:11px;color:var(--sub);flex:1;min-width:0}
+.pbook .meta .m b{display:block;font-size:15px;color:var(--text);font-weight:700;margin-top:2px;font-variant-numeric:tabular-nums}
+.pbook .meta .m b.acc{color:var(--accent)}
+.pbook .meta .m b.warn{color:var(--warn)}
+.pbook .meta .m b.err{color:var(--err)}
+.pbook .meta .m .sub2{display:block;font-size:10.5px;color:var(--sub);margin-top:2px}
+.pbook .meta .m .sub2.warn{color:var(--warn)}
+.pbook .meta .m .sub2.err{color:var(--err)}
+.pbook .spark{margin-top:12px}
+.pbook .spark svg{display:block;width:100%;height:52px}
+
+/* ---- 記録タブ ---- */
+#statTop{display:flex;gap:10px}
+#statTop .stat{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 8px;text-align:center}
+#statTop .stat .k{font-size:10.5px;color:var(--sub);letter-spacing:.03em}
+#statTop .stat .v{font-size:19px;font-weight:800;margin-top:5px;font-variant-numeric:tabular-nums}
+#statTop .stat .v small{font-size:11px;color:var(--sub);font-weight:600;margin:0 1px}
+#statTop .stat.total .v{color:var(--accent)}
+#statTop .stat.streak .v{color:var(--warn)}
+
+#chartTabs{display:flex;gap:6px;margin-bottom:14px}
+#chartTabs .tab{flex:1;background:var(--panel2);border:1px solid var(--line);color:var(--sub);border-radius:8px;padding:8px;font-size:13px;font-weight:600;cursor:pointer}
+#chartTabs .tab.on{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
+#chart{display:flex;align-items:flex-end;gap:6px;height:150px}
+#chart .col{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;min-width:0}
+#chart .bval{font-size:10px;color:var(--sub);margin-bottom:4px;height:12px;white-space:nowrap;font-variant-numeric:tabular-nums}
+#chart .barwrap{flex:1;width:100%;display:flex;align-items:flex-end;justify-content:center}
+#chart .bar{width:72%;max-width:32px;min-height:2px;border-radius:5px 5px 0 0;overflow:hidden;display:flex;flex-direction:column-reverse;transition:height .3s}
+#chart .seg{display:block;width:100%}
+#chart .col.zero .bar{background:var(--line)}
+#chart .blab{font-size:10.5px;color:var(--sub);margin-top:6px;white-space:nowrap}
+.legend{display:flex;flex-wrap:wrap;gap:8px 14px;justify-content:center;margin-top:14px}
+.legend .lg{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--sub)}
+.legend .d{width:9px;height:9px;border-radius:2px}
+
+#heat{display:flex;gap:3px;overflow-x:auto;padding-bottom:4px}
+#heat .wk{display:flex;flex-direction:column;gap:3px}
+#heat .cell{width:13px;height:13px;border-radius:3px;background:var(--panel2)}
+#heatScale{display:flex;align-items:center;gap:5px;justify-content:flex-end;margin-top:10px;font-size:11px;color:var(--sub)}
+#heatScale .cell{width:12px;height:12px;border-radius:3px}
+
+.srow{display:flex;align-items:center;gap:10px;margin-top:10px}
+.srow:first-of-type{margin-top:0}
+.srow .nm{font-size:13px;width:44px;min-width:44px}
+.srow .pbar{flex:1}
+.srow .tm{font-size:12px;color:var(--sub);min-width:70px;text-align:right;font-variant-numeric:tabular-nums}
+
+/* ---- 設定タブ ---- */
+.setrow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+.setrow:first-of-type{border-top:none}
+.setrow .t{font-size:14px;font-weight:600}
+.setrow .d{font-size:11.5px;color:var(--sub);margin-top:3px;line-height:1.5}
+.switch{width:46px;height:28px;border-radius:16px;background:var(--panel2);border:1px solid var(--line);position:relative;cursor:pointer;flex:0 0 auto;transition:.2s}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:22px;height:22px;border-radius:50%;background:var(--sub);transition:.2s}
+.switch.on{background:var(--accent-dim);border-color:var(--accent)}
+.switch.on::after{left:20px;background:var(--accent)}
+#syncStatus{font-size:12px;color:var(--sub);margin-top:10px;line-height:1.6}
+#syncStatus b{color:var(--text)}
+.small{font-size:11.5px;color:var(--sub);line-height:1.6}
+a{color:var(--accent)}
+
+/* ---- 追加ボタン ---- */
+.fab{
+  position:fixed;right:16px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:15;
+  width:54px;height:54px;border-radius:50%;background:var(--accent);color:#06121c;
+  border:none;font-size:28px;font-weight:700;cursor:pointer;
+  box-shadow:0 6px 22px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;
+}
+
+/* ---- シート/モーダル ---- */
+.sheet{position:fixed;inset:0;z-index:40;display:none}
+.sheet.on{display:block}
+.sheet .bg{position:absolute;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(2px)}
+.sheet .panel{
+  position:absolute;left:0;right:0;bottom:0;max-width:680px;margin:0 auto;
+  background:var(--panel);border-radius:18px 18px 0 0;border:1px solid var(--line);border-bottom:none;
+  max-height:92vh;overflow-y:auto;padding:8px 16px calc(20px + env(safe-area-inset-bottom));
+  animation:up .25s;
+}
+@keyframes up{from{transform:translateY(100%)}to{transform:none}}
+.sheet .grab{width:38px;height:4px;border-radius:2px;background:var(--line);margin:8px auto 6px}
+.sheet h2{font-size:17px;font-weight:700;margin:6px 2px 14px}
+.sheet h2 .x{float:right;color:var(--sub);font-size:22px;line-height:1;cursor:pointer;padding:0 4px}
+
+.stepper{display:flex;align-items:stretch;gap:8px}
+.stepper button{width:48px;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:10px;font-size:22px;font-weight:700;cursor:pointer}
+.stepper button:active{background:var(--panel)}
+.stepper input{text-align:center;font-size:18px;font-weight:700;font-variant-numeric:tabular-nums}
+.quick{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
+.quick .chip{padding:6px 11px;font-size:12.5px}
+
+#coverBox{margin-top:8px;display:flex;gap:12px;align-items:center}
+#coverPrev{width:64px;height:82px;border-radius:9px;border:1px solid var(--line);background:var(--panel2) center/cover no-repeat;flex:0 0 auto;display:flex;align-items:center;justify-content:center;color:var(--sub);font-size:24px}
+
+.toast{
+  position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom));transform:translateX(-50%);
+  background:var(--panel2);color:var(--text);border:1px solid var(--line);
+  border-radius:10px;padding:11px 18px;font-size:13.5px;font-weight:600;z-index:60;
+  box-shadow:0 6px 24px rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;white-space:nowrap;
+}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(-4px)}
+.toast.err{border-color:var(--err);color:var(--err)}
+.toast.ok{border-color:var(--ok)}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>逆算<span>プランナー</span></h1>
+  <span class="badge" id="streakBadge">🔥 0日</span>
+</header>
+
+<main>
+  <!-- 今日 -->
+  <section class="view on" id="v-today">
+    <div id="todayHero"></div>
+    <div id="todayList"></div>
+  </section>
+
+  <!-- 計画 -->
+  <section class="view" id="v-plan">
+    <div id="planSummary"></div>
+    <div id="planList"></div>
+  </section>
+
+  <!-- 記録 -->
+  <section class="view" id="v-stats">
+    <div id="statTop"></div>
+    <div class="card">
+      <div class="lbl">📊 勉強時間</div>
+      <div id="chartTabs">
+        <button class="tab on" data-m="day">日</button>
+        <button class="tab" data-m="week">週</button>
+        <button class="tab" data-m="month">月</button>
+      </div>
+      <div id="chart"></div>
+      <div class="legend" id="chartLegend"></div>
+    </div>
+    <div class="card">
+      <div class="lbl">🟦 学習ヒートマップ(過去の記録)</div>
+      <div id="heat"></div>
+      <div id="heatScale"></div>
+    </div>
+    <div class="card">
+      <div class="lbl">📚 教科別の合計時間</div>
+      <div id="subjTotals"></div>
+    </div>
+  </section>
+
+  <!-- 設定 -->
+  <section class="view" id="v-settings">
+    <div class="card">
+      <div class="lbl">🐙 GitHub同期(クラウドバックアップ)</div>
+      <p class="small" style="margin-bottom:12px">
+        個人アクセストークンで、あなたの<b style="color:var(--text)">プライベートGist</b>に全データ(写真も含む)を保存します。
+        機種変更や他の端末との同期に使えます。トークンはこの端末内にのみ保存されます。
+      </p>
+      <div class="field">
+        <label>アクセストークン(<code>gist</code> 権限)</label>
+        <input type="password" id="ghToken" placeholder="ghp_… / github_pat_…" autocomplete="off">
+        <div class="hint">GitHub → Settings → Developer settings → Tokens。<b>gist</b> にチェックを入れて発行。
+          <a href="https://github.com/settings/tokens/new?scopes=gist&description=%E9%80%86%E7%AE%97%E3%83%97%E3%83%A9%E3%83%B3%E3%83%8A%E3%83%BC" target="_blank" rel="noopener">発行ページを開く ↗</a></div>
+      </div>
+      <div class="field">
+        <label>Gist ID(空ならアップロード時に新規作成)</label>
+        <input type="text" id="ghGist" placeholder="自動で入ります" autocomplete="off">
+      </div>
+      <div class="btnrow">
+        <button class="btn pri" id="ghUp">⬆ アップロード</button>
+        <button class="btn" id="ghDown">⬇ 取得</button>
+      </div>
+      <div class="setrow" style="margin-top:6px">
+        <div><div class="t">自動同期</div><div class="d">記録を変えたら自動でGistへ保存</div></div>
+        <div class="switch" id="ghAuto"></div>
+      </div>
+      <div id="syncStatus"></div>
+    </div>
+
+    <div class="card">
+      <div class="lbl">💾 ファイルでバックアップ</div>
+      <div class="btnrow">
+        <button class="btn" id="expBtn">⬇ 書き出し</button>
+        <button class="btn" id="impBtn">⬆ 読み込み</button>
+      </div>
+      <input type="file" id="impFile" accept="application/json" hidden>
+      <div class="hint" style="margin-top:10px">JSONファイルとして保存/復元します(写真も含む)。</div>
+    </div>
+
+    <div class="card">
+      <div class="lbl">⚙️ その他</div>
+      <div class="setrow">
+        <div><div class="t">週の勉強しない曜日を一括設定</div><div class="d">新しい参考書の初期値になります</div></div>
+      </div>
+      <div class="chips" id="defRest" style="margin-top:2px"></div>
+      <button class="btn danger block" id="wipeBtn" style="margin-top:16px">すべてのデータを削除</button>
+    </div>
+
+    <div class="card">
+      <div class="lbl">ℹ️ このアプリについて</div>
+      <p class="small">
+        参考書ごとに「いつまでに・どれだけ」を決めると、残量と残り日数から<b style="color:var(--text)">1日にやる量と目安時間を逆算</b>します。
+        サボった分は自動で残りの日数に上乗せ。今日ぴったりできたら✓、違えば量と時間を記入。
+        データは端末内(localStorage / IndexedDB)に自動保存され、GitHubにもバックアップできます。
+      </p>
+    </div>
+  </section>
+</main>
+
+<button class="fab" id="fab" hidden>＋</button>
+
+<nav>
+  <button class="tabbtn on" data-v="today"><span class="ic">📅</span>今日<span class="cnt" id="badgeToday" hidden></span></button>
+  <button class="tabbtn" data-v="plan"><span class="ic">🎯</span>計画<span class="cnt" id="badgePlan" hidden></span></button>
+  <button class="tabbtn" data-v="stats"><span class="ic">📊</span>記録</button>
+  <button class="tabbtn" data-v="settings"><span class="ic">⚙️</span>設定</button>
+</nav>
+
+<!-- 参考書 追加/編集シート -->
+<div class="sheet" id="bookSheet">
+  <div class="bg" data-close></div>
+  <div class="panel">
+    <div class="grab"></div>
+    <h2 id="bookSheetTitle">参考書を追加<span class="x" data-close>×</span></h2>
+    <div class="field">
+      <label>書名</label>
+      <input type="text" id="bkName" placeholder="例)システム英単語">
+    </div>
+    <div class="field">
+      <label>教科</label>
+      <div class="chips" id="bkSubj"></div>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>総量</label>
+        <input type="number" id="bkTotal" inputmode="numeric" placeholder="2000">
+      </div>
+      <div class="field">
+        <label>単位</label>
+        <input type="text" id="bkUnit" list="unitList" placeholder="単語" value="ページ">
+        <datalist id="unitList">
+          <option value="ページ"><option value="問"><option value="単語"><option value="章"><option value="講"><option value="例題"><option value="日"><option value="回">
+        </datalist>
+      </div>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>もう終わってる量</label>
+        <input type="number" id="bkDone" inputmode="numeric" placeholder="0" value="0">
+      </div>
+      <div class="field">
+        <label>目標日(締切)</label>
+        <input type="date" id="bkDeadline">
+      </div>
+    </div>
+    <div class="field">
+      <label>勉強する曜日</label>
+      <div class="chips" id="bkWeekdays"></div>
+      <div class="hint">外した曜日は休養日として、逆算から除きます。</div>
+    </div>
+    <div class="field">
+      <label>1回あたりの目安時間(任意)</label>
+      <div class="row2">
+        <input type="number" id="bkPaceUnits" inputmode="decimal" placeholder="単位量">
+        <input type="number" id="bkPaceMin" inputmode="decimal" placeholder="分">
+      </div>
+      <div class="hint">例)「10単語で5分」。入れると1日の目安時間を出せます。記録がたまると<b>実績ペースに自動更新</b>。</div>
+    </div>
+    <div class="field">
+      <label>表紙の写真(任意・自動で圧縮)</label>
+      <div id="coverBox">
+        <div id="coverPrev">📷</div>
+        <div style="flex:1">
+          <button class="btn sm block" id="coverPick">写真を選ぶ</button>
+          <button class="btn sm ghost block danger" id="coverDel" style="margin-top:8px" hidden>写真を削除</button>
+        </div>
+      </div>
+      <input type="file" id="coverFile" accept="image/*" hidden>
+    </div>
+    <div class="btnrow">
+      <button class="btn danger" id="bkDelete" hidden>削除</button>
+      <button class="btn pri" id="bkSave" style="flex:2">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 記入シート -->
+<div class="sheet" id="logSheet">
+  <div class="bg" data-close></div>
+  <div class="panel">
+    <div class="grab"></div>
+    <h2 id="logTitle">今日の記録<span class="x" data-close>×</span></h2>
+    <div class="field">
+      <label id="logUnitLabel">やった量</label>
+      <div class="stepper">
+        <button id="logMinus">−</button>
+        <input type="number" id="logUnits" inputmode="numeric" value="0">
+        <button id="logPlus">＋</button>
+      </div>
+      <div class="quick" id="logUnitQuick"></div>
+    </div>
+    <div class="field">
+      <label>かかった時間(分)</label>
+      <div class="stepper">
+        <button id="logMinusM">−</button>
+        <input type="number" id="logMin" inputmode="numeric" value="0">
+        <button id="logPlusM">＋</button>
+      </div>
+      <div class="quick" id="logMinQuick"></div>
+    </div>
+    <div class="field">
+      <label>メモ(任意)</label>
+      <input type="text" id="logNote" placeholder="難しかった所・気づきなど">
+    </div>
+    <div class="btnrow">
+      <button class="btn ghost" id="logClear" hidden>今日の記録を消す</button>
+      <button class="btn pri" id="logSave" style="flex:2">記録する</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const el = (t, c) => { const e = document.createElement(t); if (c) e.className = c; return e; };
+const esc = s => (s==null?'':String(s)).replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+
+/* ===================== 教科・単位 ===================== */
+const SUBJECTS = ['英語','数学','国語','理科','社会','その他'];
+const SUBJ_COLORS = {'英語':'#3fb950','数学':'#3fb6ff','国語':'#ff7b72','理科':'#d29922','社会':'#f778ba','その他':'#a371f7'};
+const subjColor = s => SUBJ_COLORS[s] || '#7d8aa0';
+
+/* ===================== 状態(localStorage) ===================== */
+const LS_KEY = 'studyPlanner.v1';
+let state = { books: [], logs: {}, settings: {}, timer: null };
+try {
+  const raw = JSON.parse(localStorage.getItem(LS_KEY));
+  if (raw && typeof raw === 'object') state = Object.assign(state, raw);
+} catch (e) {}
+state.books = state.books || [];
+state.logs = state.logs || {};
+state.settings = Object.assign({ github: {}, defaultRest: [] }, state.settings || {});
+state.settings.github = state.settings.github || {};
+
+let saveTimer = null;
+function save(sync = true) {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) { toast('保存に失敗(容量不足かも)', 'err'); }
+  if (sync && state.settings.github.autoSync && state.settings.github.token) scheduleAutoSync();
+}
+const bookById = id => state.books.find(b => b.id === id);
+
+/* ===================== IndexedDB(表紙写真) ===================== */
+const DB_NAME = 'study-planner', DB_VER = 1;
+let db = null;
+function openDB() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open(DB_NAME, DB_VER);
+    r.onupgradeneeded = e => { const d = e.target.result; if (!d.objectStoreNames.contains('photos')) d.createObjectStore('photos', { keyPath: 'id' }); };
+    r.onsuccess = () => { db = r.result; res(db); };
+    r.onerror = () => rej(r.error);
+  });
+}
+const idbReq = r => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+const idbAll = store => idbReq(db.transaction(store).objectStore(store).getAll());
+const idbGet = (store, k) => idbReq(db.transaction(store).objectStore(store).get(k));
+const idbPut = (store, v) => idbReq(db.transaction(store, 'readwrite').objectStore(store).put(v));
+const idbDel = (store, k) => idbReq(db.transaction(store, 'readwrite').objectStore(store).delete(k));
+const idbClear = store => idbReq(db.transaction(store, 'readwrite').objectStore(store).clear());
+const photoURLs = new Map();
+async function photoURL(id) {
+  if (!id) return null;
+  if (photoURLs.has(id)) return photoURLs.get(id);
+  const rec = await idbGet('photos', id).catch(() => null);
+  if (!rec || !rec.blob) return null;
+  const u = URL.createObjectURL(rec.blob); photoURLs.set(id, u); return u;
+}
+function dropPhotoURL(id) { const u = photoURLs.get(id); if (u) { URL.revokeObjectURL(u); photoURLs.delete(id); } }
+
+/* 表紙は小さめに圧縮(長辺720px / JPEG) */
+function compressImage(file) {
+  return new Promise(res => {
+    const img = new Image(); const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const MAX = 720, sc = Math.min(1, MAX / Math.max(img.width, img.height));
+      const w = Math.round(img.width * sc), h = Math.round(img.height * sc);
+      const cv = el('canvas'); cv.width = w; cv.height = h;
+      cv.getContext('2d').drawImage(img, 0, 0, w, h);
+      cv.toBlob(b => { URL.revokeObjectURL(url); res(b || file); }, 'image/jpeg', 0.72);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); res(file); };
+    img.src = url;
+  });
+}
+const blobToDataURL = blob => new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); });
+
+/* ===================== 日付ヘルパー ===================== */
+const dayKey = d => (d || new Date()).toLocaleDateString('sv'); // YYYY-MM-DD(ローカル)
+const todayKey = () => dayKey();
+function keyToDate(k) { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); }
+function addDaysKey(k, n) { const d = keyToDate(k); d.setDate(d.getDate() + n); return dayKey(d); }
+const fmtMD = k => { const d = keyToDate(k); return (d.getMonth() + 1) + '/' + d.getDate(); };
+const WD = ['日', '月', '火', '水', '木', '金', '土'];
+
+// weekdays: 曜日番号(0=日..6=土)の配列。勉強する曜日。
+function studyWeekdays(book) {
+  const w = book.weekdays;
+  return (Array.isArray(w) && w.length) ? w : [0, 1, 2, 3, 4, 5, 6];
+}
+// from..to(両端含む)のうち勉強日の数
+function studyDaysBetween(book, fromK, toK) {
+  if (toK < fromK) return 0;
+  const wd = studyWeekdays(book); let n = 0, k = fromK, guard = 0;
+  while (k <= toK && guard++ < 4000) { if (wd.includes(keyToDate(k).getDay())) n++; k = addDaysKey(k, 1); }
+  return n;
+}
+// today起点で勉強日をn日進めた日付(n日目の勉強日)
+function addStudyDays(book, n) {
+  const wd = studyWeekdays(book); let k = todayKey(), left = n, guard = 0;
+  while (guard++ < 4000) { if (wd.includes(keyToDate(k).getDay())) { if (--left <= 0) return k; } k = addDaysKey(k, 1); }
+  return k;
+}
+const calDaysBetween = (fromK, toK) => Math.round((keyToDate(toK) - keyToDate(fromK)) / 86400000);
+
+/* ===================== 集計 ===================== */
+function bookDone(book) {
+  let s = book.startDone || 0;
+  for (const d in state.logs) { const r = state.logs[d][book.id]; if (r) s += r.u || 0; }
+  return s;
+}
+function bookDoneBefore(book, k) {
+  let s = book.startDone || 0;
+  for (const d in state.logs) { if (d < k) { const r = state.logs[d][book.id]; if (r) s += r.u || 0; } }
+  return s;
+}
+const logOf = (k, id) => (state.logs[k] && state.logs[k][id]) || null;
+function setLog(k, id, u, m, note) {
+  if ((u || 0) <= 0 && (m || 0) <= 0 && !note) { if (state.logs[k]) { delete state.logs[k][id]; if (!Object.keys(state.logs[k]).length) delete state.logs[k]; } }
+  else { (state.logs[k] || (state.logs[k] = {}))[id] = { u: Math.max(0, u || 0), m: Math.max(0, m || 0), note: note || '' }; }
+  save();
+}
+// 参考書の1単位あたりの分(実績優先 → 手入力 → null)
+function paceMinPerUnit(book) {
+  let u = 0, m = 0;
+  for (const d in state.logs) { const r = state.logs[d][book.id]; if (r) { u += r.u || 0; m += r.m || 0; } }
+  if (u >= 3 && m > 0) return m / u;
+  if (book.paceUnits > 0 && book.paceMin > 0) return book.paceMin / book.paceUnits;
+  return null;
+}
+
+/* ===================== 逆算エンジン ===================== */
+function calcBook(book) {
+  const today = todayKey();
+  const total = Math.max(0, book.total || 0);
+  const done = bookDone(book);
+  const doneBefore = bookDoneBefore(book, today);
+  const remainingStart = Math.max(0, total - doneBefore);
+  const remainingNow = Math.max(0, total - done);
+  const dTodayLog = logOf(today, book.id);
+  const dToday = dTodayLog ? dTodayLog.u : 0;
+  const dTodayMin = dTodayLog ? dTodayLog.m : 0;
+  const wd = studyWeekdays(book);
+  const todayIsStudy = wd.includes(keyToDate(today).getDay());
+  const pct = total > 0 ? Math.min(100, done / total * 100) : 0;
+  const timePerUnit = paceMinPerUnit(book);
+  const calToDeadline = book.deadline ? calDaysBetween(today, book.deadline) : null;
+
+  const r = { total, done, doneBefore, remainingStart, remainingNow, dToday, dTodayMin, pct, timePerUnit, calToDeadline,
+    finished: remainingNow <= 0, overdue: false, todayIsStudy, daysLeft: 0, perDay: 0, targetToday: 0, remainToday: 0,
+    targetMinToday: null, status: 'ontrack', origPerDay: 0, actualPerDay: 0, projFinishKey: null, projDiffDays: null };
+
+  if (r.finished) { r.status = 'done'; return r; }
+  if (!book.deadline) { r.status = 'nodl'; r.targetToday = 0; return r; }
+
+  // 締切超過
+  if (book.deadline < today) {
+    r.overdue = true; r.status = 'over'; r.targetToday = remainingNow; r.remainToday = Math.max(0, remainingNow - dToday);
+    if (timePerUnit) r.targetMinToday = Math.round(r.remainToday * timePerUnit);
+    return r;
+  }
+
+  // 今日を含む残り勉強日
+  const daysLeft = studyDaysBetween(book, today, book.deadline);
+  r.daysLeft = daysLeft;
+
+  if (todayIsStudy && daysLeft > 0) {
+    r.perDay = remainingStart / daysLeft;
+    r.targetToday = Math.max(1, Math.ceil(r.perDay));
+    if (r.targetToday > remainingNow + dToday) r.targetToday = remainingNow + dToday;
+  } else if (!todayIsStudy) {
+    r.targetToday = 0; // 休養日
+  } else {
+    // 勉強日が0(締切が休養日など)→ 全部今日
+    r.targetToday = remainingNow + dToday;
+  }
+  r.remainToday = Math.max(0, r.targetToday - dToday);
+  if (timePerUnit && r.targetToday > 0) r.targetMinToday = Math.round(r.targetToday * timePerUnit);
+
+  // 当初ペースと比較して 順調/遅れ/前倒し
+  const startK = book.startDate || today;
+  const totalStudyDays = Math.max(1, studyDaysBetween(book, startK, book.deadline));
+  r.origPerDay = (total - (book.startDone || 0)) / totalStudyDays;
+  if (r.perDay > r.origPerDay * 1.08) r.status = 'behind';
+  else if (r.perDay > 0 && r.perDay < r.origPerDay * 0.92) r.status = 'ahead';
+  else r.status = 'ontrack';
+
+  // 実績ペースからの完了予測
+  const elapsed = Math.max(1, studyDaysBetween(book, startK, today));
+  const doneSince = done - (book.startDone || 0);
+  r.actualPerDay = doneSince / elapsed;
+  if (r.actualPerDay > 0.01 && remainingNow > 0) {
+    const need = Math.ceil(remainingNow / r.actualPerDay);
+    r.projFinishKey = addStudyDays(book, need);
+    r.projDiffDays = calDaysBetween(book.deadline, r.projFinishKey); // + なら締切より遅い
+  }
+  return r;
+}
+
+/* ===================== 時間フォーマット ===================== */
+function fmtMin(min) {
+  min = Math.round(min);
+  if (min < 60) return min + '<small>分</small>';
+  const h = Math.floor(min / 60), m = min % 60;
+  return h + '<small>時間</small>' + (m ? m + '<small>分</small>' : '');
+}
+function fmtMinShort(min) { if (min >= 60) { const h = min / 60; return (h >= 10 ? Math.round(h) : Math.round(h * 10) / 10) + 'h'; } return Math.round(min) + 'm'; }
+
+/* ===================== トースト ===================== */
+let toastT = null;
+function toast(msg, kind) {
+  const t = $('toast'); t.textContent = msg; t.className = 'toast on' + (kind ? ' ' + kind : '');
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2200);
+}
+
+/* ===================== ストップウォッチ ===================== */
+let tickTimer = null;
+function timerElapsedMin() { if (!state.timer) return 0; return (Date.now() - state.timer.startedAt) / 60000; }
+function startTimer(bookId) {
+  if (state.timer) stopTimer(true);
+  state.timer = { bookId, startedAt: Date.now() }; save(false);
+  ensureTick(); renderToday();
+}
+function stopTimer(silent) {
+  if (!state.timer) return;
+  const { bookId, startedAt } = state.timer;
+  const min = Math.round((Date.now() - startedAt) / 60000);
+  state.timer = null;
+  if (min > 0) { const k = todayKey(), cur = logOf(k, bookId) || { u: 0, m: 0, note: '' }; setLog(k, bookId, cur.u, (cur.m || 0) + min, cur.note); }
+  else save(false);
+  stopTick();
+  if (!silent) { renderAll(); toast(min > 0 ? '⏱ ' + min + '分を記録しました' : '計測を止めました', min > 0 ? 'ok' : ''); }
+}
+function ensureTick() { if (!tickTimer) tickTimer = setInterval(paintTimer, 1000); paintTimer(); }
+function stopTick() { if (tickTimer) { clearInterval(tickTimer); tickTimer = null; } }
+function paintTimer() {
+  if (!state.timer) { stopTick(); return; }
+  const sec = Math.floor((Date.now() - state.timer.startedAt) / 1000);
+  const mm = String(Math.floor(sec / 60)).padStart(2, '0'), ss = String(sec % 60).padStart(2, '0');
+  document.querySelectorAll('.runbadge[data-b="' + state.timer.bookId + '"]').forEach(e => e.textContent = mm + ':' + ss);
+}
+
+/* ===================== ナビ ===================== */
+let curView = 'today';
+function showView(v) {
+  curView = v;
+  document.querySelectorAll('.view').forEach(s => s.classList.toggle('on', s.id === 'v-' + v));
+  document.querySelectorAll('.tabbtn').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  $('fab').hidden = !(v === 'today' || v === 'plan');
+  renderView(v);
+  window.scrollTo(0, 0);
+}
+document.querySelectorAll('.tabbtn').forEach(b => b.onclick = () => showView(b.dataset.v));
+function renderView(v) {
+  if (v === 'today') renderToday();
+  else if (v === 'plan') renderPlan();
+  else if (v === 'stats') renderStats();
+  else if (v === 'settings') renderSettings();
+}
+function renderAll() { renderBadges(); renderView(curView); }
+
+/* 連続記録: 1分以上勉強した日が続いている数 */
+function calcStreak() {
+  const dayMin = k => { const day = state.logs[k]; if (!day) return 0; let m = 0; for (const id in day) m += day[id].m || 0; return m; };
+  let streak = 0; let k = todayKey();
+  if (dayMin(k) < 1) k = addDaysKey(k, -1);
+  let guard = 0;
+  while (dayMin(k) >= 1 && guard++ < 2000) { streak++; k = addDaysKey(k, -1); }
+  return streak;
+}
+function renderBadges() {
+  $('streakBadge').textContent = '🔥 ' + calcStreak() + '日';
+  const active = state.books.filter(b => !b.archived);
+  let todo = 0, behind = 0;
+  active.forEach(b => { const c = calcBook(b); if (!c.finished && c.remainToday > 0) todo++; if (c.status === 'behind' || c.status === 'over') behind++; });
+  const bt = $('badgeToday'); bt.hidden = todo === 0; bt.textContent = todo;
+  const bp = $('badgePlan'); bp.hidden = behind === 0; bp.textContent = behind;
+}
+
+/* ===================== 今日タブ ===================== */
+const STATUS_TAG = {
+  done: ['ok', '完了'], ahead: ['info', '前倒し'], ontrack: ['ok', '順調'],
+  behind: ['warn', '遅れぎみ'], over: ['err', '締切超過'], nodl: ['mute', '締切なし']
+};
+async function renderToday() {
+  const active = state.books.filter(b => !b.archived);
+  const hero = $('todayHero'), list = $('todayList');
+  const dt = new Date();
+  const dateStr = (dt.getMonth() + 1) + '月' + dt.getDate() + '日(' + WD[dt.getDay()] + ')';
+
+  if (!active.length) {
+    hero.innerHTML = '';
+    list.innerHTML = '<div class="empty"><div class="big">🎯</div><p>まず参考書を登録しよう</p>' +
+      '<p class="small">「いつまでに・どれだけ終わらせる」を決めると、1日にやる量を逆算します。</p>' +
+      '<button class="btn pri" style="margin-top:16px" onclick="openBookSheet()">＋ 参考書を追加</button></div>';
+    return;
+  }
+
+  const calcs = active.map(b => ({ b, c: calcBook(b) }));
+  let totalMin = 0, totalTargetMin = 0, remainBooks = 0;
+  calcs.forEach(({ b, c }) => { totalMin += c.dTodayMin; if (!c.finished) { if (c.targetMinToday) totalTargetMin += c.targetMinToday; if (c.remainToday > 0) remainBooks++; } });
+  const doneMinAll = totalMin;
+
+  let msg;
+  if (remainBooks === 0) msg = '🎉 今日のノルマは全部クリア!おつかれさま。';
+  else if (doneMinAll === 0) msg = 'さあ始めよう。今日やる分は下のリストの通り。';
+  else msg = 'あと ' + remainBooks + '冊。この調子!';
+
+  hero.innerHTML =
+    '<div class="date">' + dateStr + '</div>' +
+    '<div class="line"><span class="big">' + fmtMin(doneMinAll) + '</span><span class="msg" style="margin:0">勉強した</span></div>' +
+    '<div class="mini">' +
+      '<div>今日の目安<b class="acc">' + (totalTargetMin ? fmtMin(totalTargetMin) : '—') + '</b></div>' +
+      '<div>残りの冊数<b class="' + (remainBooks ? 'warn' : '') + '">' + remainBooks + '<small>冊</small></b></div>' +
+      '<div>連続<b>' + calcStreak() + '<small>日</small></b></div>' +
+    '</div>' +
+    '<div class="msg">' + msg + '</div>';
+
+  // 未完 → 休養/完了 の順
+  calcs.sort((a, b) => rank(a.c) - rank(b.c));
+  function rank(c) { if (c.finished) return 3; if (c.status === 'over') return 0; if (c.remainToday > 0) return 1; return 2; }
+
+  list.innerHTML = calcs.map(({ b, c }) => todayCard(b, c)).join('');
+  // 写真は非同期で差し込み
+  for (const { b } of calcs) { if (b.photoId) { const u = await photoURL(b.photoId); if (u) { const im = document.querySelector('.tbook[data-b="' + b.id + '"] .cover'); if (im) im.style.backgroundImage = 'url(' + u + ')'; } } }
+  if (state.timer) ensureTick();
+}
+function todayCard(b, c) {
+  const running = state.timer && state.timer.bookId === b.id;
+  const [tk, tl] = STATUS_TAG[c.status] || STATUS_TAG.ontrack;
+  const cls = c.finished ? 'done' : c.status === 'over' ? 'over' : c.status === 'behind' ? 'behind' : '';
+  let body;
+  if (c.finished) {
+    body = '<div class="doneline">✓ 完走!(' + esc(b.unit || '') + ' ' + c.total + 'まで達成)</div>';
+  } else if (c.status === 'nodl') {
+    body = '<div class="rest">📅 目標日を決めると、1日にやる量を逆算します。</div>' +
+      '<div class="acts"><button class="btn sm" onclick="openBookSheet(\'' + b.id + '\')">締切を設定</button>' +
+      '<button class="btn sm ghost" onclick="openLogSheet(\'' + b.id + '\')">記入</button>' + timerBtn(b, running) + '</div>';
+  } else if (!c.todayIsStudy && c.status !== 'over') {
+    const dtl = c.dToday > 0 ? '(今日 ' + c.dToday + esc(b.unit || '') + '・' + Math.round(c.dTodayMin) + '分)' : '';
+    body = '<div class="rest">💤 今日は休養日。やる場合は「記入」から記録できます。' + dtl + '</div>' +
+      '<div class="acts"><button class="btn sm ghost" onclick="openLogSheet(\'' + b.id + '\')">記入</button>' + timerBtn(b, running) + '</div>';
+  } else {
+    const met = c.remainToday <= 0;
+    const goal =
+      '<div class="goal"><span class="q">' + c.targetToday + '</span><span class="u">' + esc(b.unit || '') + '</span>' +
+      (c.targetMinToday ? '<span class="sep">·</span><span class="t">≈' + fmtMinShort(c.targetMinToday).replace('h', '時間').replace('m', '分') + '</span>' : '') +
+      (c.overdue ? '<span class="tag err" style="margin-left:auto">超過</span>' : '') + '</div>';
+    const pdone = c.targetToday > 0 ? Math.min(100, c.dToday / c.targetToday * 100) : 0;
+    const prog = '<div class="prog"><div class="pbar"><span class="b" style="width:' + pdone + '%;background:' + (met ? 'var(--ok)' : subjColor(b.subject)) + '"></span></div>' +
+      '<span class="pv">' + c.dToday + '/' + c.targetToday + '</span></div>';
+    let acts;
+    if (met) {
+      acts = '<div class="doneline">✓ 今日のノルマ達成(' + c.dToday + esc(b.unit || '') + '・' + Math.round(c.dTodayMin) + '分)</div>' +
+        '<div class="acts"><button class="btn sm ghost" onclick="openLogSheet(\'' + b.id + '\')">修正</button>' + timerBtn(b, running) + '</div>';
+    } else {
+      acts = '<div class="acts">' +
+        '<button class="btn ok sm" onclick="quickDone(\'' + b.id + '\')">✓ できた</button>' +
+        '<button class="btn sm" onclick="openLogSheet(\'' + b.id + '\')">✎ 記入</button>' +
+        timerBtn(b, running) + '</div>';
+    }
+    body = goal + prog + acts;
+  }
+  return '<div class="tbook ' + cls + '" data-b="' + b.id + '">' +
+    '<div class="top"><span class="dot" style="background:' + subjColor(b.subject) + '"></span>' +
+    (b.photoId ? '<span class="cover" style="width:26px;height:26px;border-radius:6px;background:var(--panel2) center/cover;flex:0 0 auto"></span>' : '') +
+    '<span class="nm">' + esc(b.name) + '</span>' +
+    '<span class="tag ' + tk + '">' + tl + '</span></div>' + body + '</div>';
+}
+function timerBtn(b, running) {
+  if (running) return '<button class="btn sm ok" onclick="stopTimer()" style="flex:0 0 auto">■ <span class="runbadge" data-b="' + b.id + '">00:00</span></button>';
+  return '<button class="btn sm ghost" onclick="startTimer(\'' + b.id + '\')" style="flex:0 0 auto">▶ 計測</button>';
+}
+// 「ぴったりできた」= 今日の目標ちょうどを記録
+function quickDone(id) {
+  const b = bookById(id); if (!b) return;
+  const c = calcBook(b), k = todayKey(), cur = logOf(k, id) || { u: 0, m: 0, note: '' };
+  const min = c.targetMinToday != null ? c.targetMinToday : (cur.m || 0);
+  setLog(k, id, c.targetToday, min, cur.note);
+  renderAll(); toast('✓ ' + esc(b.name) + ' 達成!', 'ok');
+}
+
+/* ===================== 記入シート ===================== */
+let logCtx = null;
+function openLogSheet(id) {
+  const b = bookById(id); if (!b) return;
+  const c = calcBook(b), k = todayKey(), cur = logOf(k, id);
+  logCtx = { id, unit: b.unit || '' };
+  $('logTitle').innerHTML = esc(b.name) + '<span class="x" data-close>×</span>';
+  $('logUnitLabel').textContent = 'やった量(' + esc(b.unit || '量') + ')';
+  const defU = cur ? cur.u : (c.remainToday > 0 ? c.remainToday : c.targetToday);
+  $('logUnits').value = defU || 0;
+  $('logMin').value = cur ? cur.m : (c.targetMinToday || 0);
+  $('logNote').value = cur ? (cur.note || '') : '';
+  $('logClear').hidden = !cur;
+  // 量クイック
+  $('logUnitQuick').innerHTML = [-10, -5, -1, 1, 5, 10].map(n => '<span class="chip" data-d="' + n + '" data-t="u">' + (n > 0 ? '+' : '') + n + '</span>').join('') +
+    (c.targetToday ? '<span class="chip" data-set="' + c.targetToday + '" data-t="u">目標' + c.targetToday + '</span>' : '');
+  $('logMinQuick').innerHTML = [15, 30, 45, 60].map(n => '<span class="chip" data-d="' + n + '" data-t="m">+' + n + '分</span>').join('') +
+    '<span class="chip" data-set="0" data-t="m">0</span>';
+  openSheet('logSheet');
+}
+$('logUnitQuick').onclick = $('logMinQuick').onclick = e => {
+  const c = e.target.closest('.chip'); if (!c) return;
+  const inp = c.dataset.t === 'u' ? $('logUnits') : $('logMin');
+  if (c.dataset.set != null) inp.value = c.dataset.set;
+  else inp.value = Math.max(0, (parseInt(inp.value) || 0) + parseInt(c.dataset.d));
+};
+$('logMinus').onclick = () => $('logUnits').value = Math.max(0, (parseInt($('logUnits').value) || 0) - 1);
+$('logPlus').onclick = () => $('logUnits').value = (parseInt($('logUnits').value) || 0) + 1;
+$('logMinusM').onclick = () => $('logMin').value = Math.max(0, (parseInt($('logMin').value) || 0) - 5);
+$('logPlusM').onclick = () => $('logMin').value = (parseInt($('logMin').value) || 0) + 5;
+$('logSave').onclick = () => {
+  if (!logCtx) return;
+  const u = Math.max(0, parseInt($('logUnits').value) || 0);
+  const m = Math.max(0, parseInt($('logMin').value) || 0);
+  setLog(todayKey(), logCtx.id, u, m, $('logNote').value.trim());
+  closeSheet('logSheet'); renderAll(); toast('記録しました', 'ok');
+};
+$('logClear').onclick = () => { if (!logCtx) return; if (!confirm('今日の記録を消しますか?')) return; setLog(todayKey(), logCtx.id, 0, 0, ''); closeSheet('logSheet'); renderAll(); };
+
+/* ===================== 計画タブ ===================== */
+async function renderPlan() {
+  const active = state.books.filter(b => !b.archived);
+  const sum = $('planSummary'), list = $('planList');
+  if (!active.length) {
+    sum.innerHTML = '';
+    list.innerHTML = '<div class="empty"><div class="big">🎯</div><p>参考書がまだありません</p>' +
+      '<button class="btn pri" style="margin-top:16px" onclick="openBookSheet()">＋ 参考書を追加</button></div>';
+    return;
+  }
+  let tot = 0, don = 0, near = null;
+  active.forEach(b => { const c = calcBook(b); tot += c.total; don += Math.min(c.done, c.total); if (b.deadline && (!near || b.deadline < near)) near = b.deadline; });
+  const pct = tot > 0 ? Math.round(don / tot * 100) : 0;
+  sum.innerHTML = '<div class="card"><div class="lbl">全体の進捗</div>' +
+    '<div class="prog" style="display:flex;align-items:center;gap:10px"><div class="pbar" style="flex:1"><span class="b" style="width:' + pct + '%;background:var(--accent)"></span></div>' +
+    '<span style="font-size:18px;font-weight:800;font-variant-numeric:tabular-nums">' + pct + '%</span></div>' +
+    '<div class="hint" style="margin-top:10px">参考書 ' + active.length + '冊' + (near ? ' ・ 直近の締切 ' + fmtMD(near) + '(あと' + Math.max(0, calDaysBetween(todayKey(), near)) + '日)' : '') + '</div></div>';
+
+  const calcs = active.map(b => ({ b, c: calcBook(b) })).sort((a, b) => {
+    if (!a.b.deadline) return 1; if (!b.b.deadline) return -1; return a.b.deadline < b.b.deadline ? -1 : 1;
+  });
+  list.innerHTML = calcs.map(({ b, c }) => planCard(b, c)).join('');
+  for (const { b } of calcs) { if (b.photoId) { const u = await photoURL(b.photoId); if (u) { const im = document.querySelector('.pbook[data-b="' + b.id + '"] .cover'); if (im) im.style.backgroundImage = 'url(' + u + ')'; } } }
+}
+function planCard(b, c) {
+  const [tk, tl] = STATUS_TAG[c.status] || STATUS_TAG.ontrack;
+  const u = esc(b.unit || '');
+  // 1日のノルマ
+  let perDayTxt;
+  if (c.finished) perDayTxt = '—';
+  else if (c.status === 'nodl') perDayTxt = '締切未設定';
+  else if (c.overdue) perDayTxt = '残り' + c.remainingNow + u;
+  else if (!c.todayIsStudy) perDayTxt = Math.max(1, Math.ceil(c.perDay)) + u + '/日';
+  else perDayTxt = c.targetToday + u + '/日';
+  // 締切
+  let dlMain = '未設定', dlSub = '', dlSubCls = '';
+  if (b.deadline) { const d = calDaysBetween(todayKey(), b.deadline); dlMain = fmtMD(b.deadline); dlSub = d < 0 ? Math.abs(d) + '日超過' : 'あと' + d + '日'; dlSubCls = d < 0 ? 'err' : d <= 7 ? 'warn' : ''; }
+  // 完了予測(実績ペース)
+  let projMain = '—', projSub = '', projCls = '';
+  if (c.finished) { projMain = '🎉'; projSub = '完了'; }
+  else if (c.projFinishKey) { const diff = c.projDiffDays; projMain = fmtMD(c.projFinishKey); projSub = diff > 0 ? diff + '日遅れ' : diff < 0 ? Math.abs(diff) + '日早い' : 'ちょうど'; projCls = diff > 0 ? 'err' : 'acc'; }
+  else projSub = '記録待ち';
+
+  return '<div class="pbook" data-b="' + b.id + '" onclick="openBookSheet(\'' + b.id + '\')">' +
+    '<div class="top"><span class="dot" style="background:' + subjColor(b.subject) + '"></span>' +
+    (b.photoId ? '<span class="cover" style="width:30px;height:38px;border-radius:6px;background:var(--panel2) center/cover;flex:0 0 auto"></span>' : '') +
+    '<div style="flex:1;min-width:0"><div class="nm">' + esc(b.name) + '</div><div class="sub">' + esc(b.subject || '') + ' · ' + c.done + '/' + c.total + u + '</div></div>' +
+    '<span class="tag ' + tk + '">' + tl + '</span></div>' +
+    '<div class="prog"><div class="pbar" style="flex:1"><span class="b" style="width:' + c.pct + '%;background:' + subjColor(b.subject) + '"></span></div>' +
+    '<span class="pv">' + Math.round(c.pct) + '%</span></div>' +
+    '<div class="meta">' +
+    '<div class="m">1日のノルマ<b class="acc">' + perDayTxt + '</b></div>' +
+    '<div class="m">締切<b>' + dlMain + '</b><span class="sub2 ' + dlSubCls + '">' + dlSub + '</span></div>' +
+    '<div class="m">完了予測<b class="' + projCls + '">' + projMain + '</b><span class="sub2">' + projSub + '</span></div>' +
+    '</div>' + burndown(b, c) + '</div>';
+}
+// バーンダウン(残量)スパークライン
+function burndown(b, c) {
+  if (!b.deadline || !b.startDate) return '';
+  const W = 300, H = 52, pad = 3;
+  const startK = b.startDate, endK = b.deadline, today = todayKey();
+  const span = Math.max(1, calDaysBetween(startK, endK));
+  const total = c.total, startRemain = total - (b.startDone || 0);
+  if (startRemain <= 0) return '';
+  const x = k => pad + Math.min(1, Math.max(0, calDaysBetween(startK, k) / span)) * (W - 2 * pad);
+  const y = rem => pad + (1 - rem / total) * (H - 2 * pad);
+  // 理想線: (start,total) → (deadline, 完了=total-startRemainのまま0残…) 残量ベースで total-startDone → 0
+  const ideal = 'M' + x(startK) + ',' + y(startRemain) + ' L' + x(endK) + ',' + y(0);
+  // 実績: 各日の「その日終了時点の残量」を累積で描く
+  const pts = [[x(startK), y(startRemain)]];
+  const dayU = {};
+  Object.keys(state.logs).forEach(k => { if (k >= startK && k <= today) { const r = state.logs[k][b.id]; if (r && r.u) dayU[k] = r.u; } });
+  let cum = (b.startDone || 0);
+  Object.keys(dayU).sort().forEach(k => { cum += dayU[k]; pts.push([x(k), y(Math.max(0, total - cum))]); });
+  pts.push([x(today), y(Math.max(0, c.remainingNow))]);
+  const actual = 'M' + pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' L');
+  const tx = x(today);
+  return '<div class="spark"><svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' +
+    '<line x1="' + tx + '" y1="0" x2="' + tx + '" y2="' + H + '" stroke="var(--line)" stroke-width="1" stroke-dasharray="3 3"/>' +
+    '<path d="' + ideal + '" fill="none" stroke="var(--sub)" stroke-width="1.4" stroke-dasharray="4 3" opacity=".7"/>' +
+    '<path d="' + actual + '" fill="none" stroke="' + subjColor(b.subject) + '" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>' +
+    '</svg></div>';
+}
+
+/* ===================== 参考書 追加/編集シート ===================== */
+let bookCtx = null; // {id?, photoId, coverBlob?(未保存), coverRemoved?}
+function subjChips(sel) { return SUBJECTS.map(s => '<span class="chip' + (s === sel ? ' on' : '') + '" data-s="' + s + '">' + s + '</span>').join(''); }
+function wdChips(arr) { return WD.map((w, i) => '<span class="chip' + (arr.includes(i) ? ' on' : '') + '" data-w="' + i + '">' + w + '</span>').join(''); }
+function openBookSheet(id) {
+  const b = id ? bookById(id) : null;
+  bookCtx = { id: id || null, photoId: b ? b.photoId : null, coverBlob: null, coverRemoved: false };
+  $('bookSheetTitle').innerHTML = (b ? '参考書を編集' : '参考書を追加') + '<span class="x" data-close>×</span>';
+  $('bkName').value = b ? b.name : '';
+  $('bkSubj').innerHTML = subjChips(b ? b.subject : '英語');
+  $('bkTotal').value = b ? b.total : '';
+  $('bkUnit').value = b ? (b.unit || 'ページ') : 'ページ';
+  $('bkDone').value = b ? (b.startDone || 0) : 0;
+  $('bkDeadline').value = b ? (b.deadline || '') : defaultDeadline();
+  $('bkWeekdays').innerHTML = wdChips(b ? studyWeekdays(b) : allButRest());
+  $('bkPaceUnits').value = b && b.paceUnits ? b.paceUnits : '';
+  $('bkPaceMin').value = b && b.paceMin ? b.paceMin : '';
+  $('bkDelete').hidden = !b;
+  // 表紙プレビュー
+  const prev = $('coverPrev'); prev.style.backgroundImage = ''; prev.textContent = '📷';
+  $('coverDel').hidden = !(b && b.photoId);
+  if (b && b.photoId) photoURL(b.photoId).then(u => { if (u && bookCtx && bookCtx.photoId === b.photoId) { prev.style.backgroundImage = 'url(' + u + ')'; prev.textContent = ''; } });
+  openSheet('bookSheet');
+}
+function defaultDeadline() { const d = new Date(); d.setMonth(d.getMonth() + 1); return dayKey(d); }
+function allButRest() { const rest = state.settings.defaultRest || []; return [0, 1, 2, 3, 4, 5, 6].filter(i => !rest.includes(i)); }
+$('bkSubj').onclick = e => { const c = e.target.closest('.chip'); if (!c) return; $('bkSubj').querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x === c)); };
+$('bkWeekdays').onclick = e => { const c = e.target.closest('.chip'); if (!c) return; c.classList.toggle('on'); };
+$('coverPick').onclick = () => $('coverFile').click();
+$('coverFile').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  const blob = await compressImage(f);
+  bookCtx.coverBlob = blob; bookCtx.coverRemoved = false;
+  const u = URL.createObjectURL(blob);
+  const prev = $('coverPrev'); prev.style.backgroundImage = 'url(' + u + ')'; prev.textContent = '';
+  $('coverDel').hidden = false;
+};
+$('coverDel').onclick = () => { bookCtx.coverBlob = null; bookCtx.coverRemoved = true; const prev = $('coverPrev'); prev.style.backgroundImage = ''; prev.textContent = '📷'; $('coverDel').hidden = true; };
+$('bkSave').onclick = async () => {
+  const name = $('bkName').value.trim();
+  const total = parseInt($('bkTotal').value) || 0;
+  if (!name) { toast('書名を入れてね', 'err'); return; }
+  if (total <= 0) { toast('総量を入れてね', 'err'); return; }
+  const subjEl = $('bkSubj').querySelector('.chip.on');
+  const wd = [...$('bkWeekdays').querySelectorAll('.chip.on')].map(c => parseInt(c.dataset.w));
+  let b = bookCtx.id ? bookById(bookCtx.id) : null;
+  if (!b) { b = { id: uid(), createdAt: Date.now(), startDate: todayKey() }; state.books.push(b); }
+  b.name = name;
+  b.subject = subjEl ? subjEl.dataset.s : 'その他';
+  b.total = total;
+  b.unit = $('bkUnit').value.trim() || 'ページ';
+  b.startDone = Math.max(0, parseInt($('bkDone').value) || 0);
+  b.deadline = $('bkDeadline').value || '';
+  b.weekdays = wd.length ? wd : [0, 1, 2, 3, 4, 5, 6];
+  b.paceUnits = parseFloat($('bkPaceUnits').value) || 0;
+  b.paceMin = parseFloat($('bkPaceMin').value) || 0;
+  if (!b.startDate) b.startDate = todayKey();
+  // 表紙
+  if (bookCtx.coverBlob) {
+    const pid = b.photoId || uid();
+    await idbPut('photos', { id: pid, blob: bookCtx.coverBlob }); dropPhotoURL(pid); b.photoId = pid;
+  } else if (bookCtx.coverRemoved && b.photoId) {
+    await idbDel('photos', b.photoId); dropPhotoURL(b.photoId); b.photoId = null;
+  }
+  save();
+  closeSheet('bookSheet'); renderAll();
+  toast(bookCtx.id ? '更新しました' : '追加しました', 'ok');
+};
+$('bkDelete').onclick = async () => {
+  if (!bookCtx.id) return; const b = bookById(bookCtx.id); if (!b) return;
+  if (!confirm('「' + b.name + '」を削除しますか?\nこの参考書の記録も消えます。')) return;
+  if (b.photoId) { await idbDel('photos', b.photoId).catch(() => {}); dropPhotoURL(b.photoId); }
+  for (const k in state.logs) { if (state.logs[k][b.id]) { delete state.logs[k][b.id]; if (!Object.keys(state.logs[k]).length) delete state.logs[k]; } }
+  state.books = state.books.filter(x => x.id !== b.id);
+  if (state.timer && state.timer.bookId === b.id) { state.timer = null; stopTick(); }
+  save(); closeSheet('bookSheet'); renderAll(); toast('削除しました');
+};
+
+/* ===================== 記録タブ ===================== */
+let chartMode = 'day';
+function dayMinBySubj(k) {
+  const o = {}; const day = state.logs[k]; if (!day) return o;
+  for (const id in day) { const b = bookById(id); const s = b ? b.subject : 'その他'; o[s] = (o[s] || 0) + (day[id].m || 0); }
+  return o;
+}
+function rangeData() {
+  const arr = [];
+  if (chartMode === 'day') {
+    for (let i = 6; i >= 0; i--) { const k = addDaysKey(todayKey(), -i); const subs = dayMinBySubj(k); const min = Object.values(subs).reduce((a, b) => a + b, 0); arr.push({ label: fmtMD(k), min, subs }); }
+  } else if (chartMode === 'week') {
+    for (let w = 5; w >= 0; w--) {
+      const base = addDaysKey(todayKey(), -((keyToDate(todayKey()).getDay() + 6) % 7) - w * 7); // 月曜
+      let min = 0; const subs = {};
+      for (let j = 0; j < 7; j++) { const k = addDaysKey(base, j); const s = dayMinBySubj(k); for (const x in s) { subs[x] = (subs[x] || 0) + s[x]; min += s[x]; } }
+      arr.push({ label: fmtMD(base), min, subs });
+    }
+  } else {
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const m = new Date(now.getFullYear(), now.getMonth() - i, 1); const prefix = dayKey(m).slice(0, 7);
+      let min = 0; const subs = {};
+      for (const k in state.logs) { if (k.slice(0, 7) === prefix) { const s = dayMinBySubj(k); for (const x in s) { subs[x] = (subs[x] || 0) + s[x]; min += s[x]; } } }
+      arr.push({ label: (m.getMonth() + 1) + '月', min, subs });
+    }
+  }
+  return arr;
+}
+function renderChart() {
+  const data = rangeData(); const max = Math.max(1, ...data.map(d => d.min));
+  $('chart').innerHTML = data.map(d => {
+    const h = d.min > 0 ? Math.max(4, Math.round(d.min / max * 100)) : 0;
+    let inner = '';
+    if (d.min > 0) for (const s of SUBJECTS) { const v = d.subs[s] || 0; if (v > 0) inner += '<span class="seg" style="height:' + (v / d.min * 100) + '%;background:' + subjColor(s) + '"></span>'; }
+    return '<div class="col' + (d.min > 0 ? '' : ' zero') + '"><div class="bval">' + (d.min > 0 ? fmtMinShort(d.min) : '') + '</div>' +
+      '<div class="barwrap"><div class="bar" style="height:' + h + '%">' + inner + '</div></div><div class="blab">' + d.label + '</div></div>';
+  }).join('');
+  $('chartLegend').innerHTML = SUBJECTS.map(s => '<span class="lg"><span class="d" style="background:' + subjColor(s) + '"></span>' + s + '</span>').join('');
+}
+function renderHeat() {
+  const WEEKS = 18; const wrap = $('heat'); wrap.innerHTML = '';
+  const today = keyToDate(todayKey());
+  const end = new Date(today); end.setDate(end.getDate() + (6 - ((today.getDay() + 6) % 7))); // 今週日曜
+  const cells = [];
+  for (let w = WEEKS - 1; w >= 0; w--) {
+    const col = el('div', 'wk');
+    for (let d = 0; d < 7; d++) {
+      const dt = new Date(end); dt.setDate(end.getDate() - w * 7 - (6 - d));
+      const k = dayKey(dt); const day = state.logs[k]; let min = 0; if (day) for (const id in day) min += day[id].m || 0;
+      const lv = min <= 0 ? 0 : min < 20 ? 1 : min < 45 ? 2 : min < 90 ? 3 : 4;
+      const c = el('div', 'cell');
+      const alpha = [0, .28, .5, .74, 1][lv];
+      if (lv > 0) c.style.background = 'rgba(63,182,255,' + alpha + ')';
+      if (dt > today) c.style.visibility = 'hidden';
+      c.title = fmtMD(k) + ' ' + Math.round(min) + '分';
+      col.appendChild(c);
+    }
+    wrap.appendChild(col);
+  }
+  $('heatScale').innerHTML = '少 ' + [0, 1, 2, 3, 4].map(l => '<span class="cell" style="background:' + (l === 0 ? 'var(--panel2)' : 'rgba(63,182,255,' + [0, .28, .5, .74, 1][l] + ')') + '"></span>').join('') + ' 多';
+}
+function renderStats() {
+  // 上段サマリ
+  let totalMin = 0; for (const k in state.logs) for (const id in state.logs[k]) totalMin += state.logs[k][id].m || 0;
+  const todayMin = Object.values(state.logs[todayKey()] || {}).reduce((a, r) => a + (r.m || 0), 0);
+  $('statTop').innerHTML =
+    '<div class="stat total"><div class="k">累計時間</div><div class="v">' + fmtMin(totalMin) + '</div></div>' +
+    '<div class="stat"><div class="k">今日</div><div class="v">' + fmtMin(todayMin) + '</div></div>' +
+    '<div class="stat streak"><div class="k">🔥 連続</div><div class="v">' + calcStreak() + '<small>日</small></div></div>';
+  renderChart(); renderHeat();
+  // 教科別合計
+  const t = {}; for (const k in state.logs) for (const id in state.logs[k]) { const b = bookById(id); const s = b ? b.subject : 'その他'; t[s] = (t[s] || 0) + (state.logs[k][id].m || 0); }
+  const rows = Object.keys(t).map(s => ({ s, m: t[s] })).filter(r => r.m > 0).sort((a, b) => b.m - a.m);
+  const box = $('subjTotals');
+  if (!rows.length) { box.innerHTML = '<div class="hint">まだ記録がありません。</div>'; return; }
+  const max = Math.max(...rows.map(r => r.m));
+  box.innerHTML = rows.map(r => '<div class="srow"><span class="nm">' + esc(r.s) + '</span><span class="pbar"><span class="b" style="width:' + Math.max(6, Math.round(r.m / max * 100)) + '%;background:' + subjColor(r.s) + '"></span></span><span class="tm">' + fmtMin(r.m) + '</span></div>').join('');
+}
+document.querySelectorAll('#chartTabs .tab').forEach(t => t.onclick = () => {
+  chartMode = t.dataset.m; document.querySelectorAll('#chartTabs .tab').forEach(x => x.classList.toggle('on', x === t)); renderChart();
+});
+
+/* ===================== シート開閉 ===================== */
+function openSheet(id) { $(id).classList.add('on'); document.body.style.overflow = 'hidden'; }
+function closeSheet(id) { $(id).classList.remove('on'); document.body.style.overflow = ''; }
+document.querySelectorAll('.sheet').forEach(s => s.addEventListener('click', e => { if (e.target.hasAttribute('data-close') || e.target.classList.contains('bg')) closeSheet(s.id); }));
+$('fab').onclick = () => openBookSheet();
+
+/* ===================== 設定タブ ===================== */
+function renderSettings() {
+  const g = state.settings.github;
+  $('ghToken').value = g.token || '';
+  $('ghGist').value = g.gistId || '';
+  $('ghAuto').classList.toggle('on', !!g.autoSync);
+  $('defRest').innerHTML = WD.map((w, i) => '<span class="chip' + ((state.settings.defaultRest || []).includes(i) ? ' on' : '') + '" data-w="' + i + '">' + w + '</span>').join('');
+  updateSyncStatus();
+}
+function updateSyncStatus() {
+  const g = state.settings.github; const s = $('syncStatus');
+  let html = '';
+  if (g.lastSync) html += '最終同期: <b>' + new Date(g.lastSync).toLocaleString('ja-JP') + '</b>';
+  else html += 'まだ同期していません。';
+  if (g.gistId) html += '<br>Gist: <b>' + esc(g.gistId) + '</b>';
+  s.innerHTML = html;
+}
+$('ghToken').onchange = () => { state.settings.github.token = $('ghToken').value.trim(); save(false); };
+$('ghGist').onchange = () => { state.settings.github.gistId = $('ghGist').value.trim(); save(false); };
+$('ghAuto').onclick = () => { state.settings.github.autoSync = !state.settings.github.autoSync; $('ghAuto').classList.toggle('on', state.settings.github.autoSync); save(false); if (state.settings.github.autoSync) toast('自動同期をON', 'ok'); };
+$('defRest').onclick = e => { const c = e.target.closest('.chip'); if (!c) return; c.classList.toggle('on'); state.settings.defaultRest = [...$('defRest').querySelectorAll('.chip.on')].map(x => parseInt(x.dataset.w)); save(false); };
+
+/* ---- バックアップ(JSON) ---- */
+async function buildBackup() {
+  const photos = await idbAll('photos').catch(() => []);
+  return {
+    app: 'study-planner', version: 1, exportedAt: new Date().toISOString(),
+    books: state.books, logs: state.logs,
+    settings: { defaultRest: state.settings.defaultRest || [] }, // トークンは含めない
+    photos: await Promise.all(photos.map(async p => ({ id: p.id, dataURL: await blobToDataURL(p.blob) })))
+  };
+}
+async function restoreBackup(data, { merge } = {}) {
+  if (data.app !== 'study-planner') throw new Error('形式が違います');
+  if (!merge) { state.books = []; state.logs = {}; }
+  const byId = {}; state.books.forEach(b => byId[b.id] = b);
+  (data.books || []).forEach(b => { if (byId[b.id]) Object.assign(byId[b.id], b); else state.books.push(b); });
+  for (const k in (data.logs || {})) { state.logs[k] = Object.assign(state.logs[k] || {}, data.logs[k]); }
+  if (data.settings && data.settings.defaultRest) state.settings.defaultRest = data.settings.defaultRest;
+  for (const p of (data.photos || [])) { const blob = await (await fetch(p.dataURL)).blob(); await idbPut('photos', { id: p.id, blob }); dropPhotoURL(p.id); }
+  save(false);
+}
+$('expBtn').onclick = async () => {
+  const out = await buildBackup();
+  const blob = new Blob([JSON.stringify(out)], { type: 'application/json' });
+  const a = el('a'); a.href = URL.createObjectURL(blob); a.download = '逆算プランナー_' + todayKey() + '.json'; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000); toast('⬇ 書き出しました', 'ok');
+};
+$('impBtn').onclick = () => $('impFile').click();
+$('impFile').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    const data = JSON.parse(await f.text());
+    if (!confirm('参考書' + (data.books || []).length + '冊 / 記録' + Object.keys(data.logs || {}).length + '日分を読み込みます。よろしいですか?')) return;
+    await restoreBackup(data, { merge: true }); renderAll(); toast('⬆ 読み込みました', 'ok');
+  } catch (err) { toast('読み込めません: ' + err.message, 'err'); }
+};
+$('wipeBtn').onclick = async () => {
+  if (!confirm('参考書・記録・写真をすべて削除します。よろしいですか?')) return;
+  if (!confirm('本当に削除しますか?この操作は取り消せません。')) return;
+  state.books = []; state.logs = {}; state.timer = null; stopTick();
+  await idbClear('photos').catch(() => {}); photoURLs.forEach(u => URL.revokeObjectURL(u)); photoURLs.clear();
+  save(false); renderAll(); toast('削除しました');
+};
+
+/* ===================== GitHub Gist 同期 ===================== */
+const GIST_FILE = 'study-planner-data.json';
+function ghHeaders(token) { return { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }; }
+async function githubUpload(quiet) {
+  const g = state.settings.github; const token = (g.token || '').trim();
+  if (!token) { if (!quiet) toast('トークンを入れてね', 'err'); return; }
+  if (!quiet) toast('同期中…');
+  try {
+    const payload = await buildBackup();
+    const body = { description: '逆算プランナー データ', files: { [GIST_FILE]: { content: JSON.stringify(payload) } } };
+    let res;
+    if (g.gistId) res = await fetch('https://api.github.com/gists/' + g.gistId, { method: 'PATCH', headers: ghHeaders(token), body: JSON.stringify(body) });
+    else res = await fetch('https://api.github.com/gists', { method: 'POST', headers: ghHeaders(token), body: JSON.stringify(Object.assign({ public: false }, body)) });
+    if (res.status === 401) throw new Error('トークンが無効です');
+    if (res.status === 404) { g.gistId = ''; throw new Error('Gistが見つかりません(IDを空にして再アップ)'); }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const j = await res.json();
+    g.gistId = j.id; g.lastSync = Date.now(); save(false);
+    if (curView === 'settings') renderSettings();
+    if (!quiet) toast('⬆ 同期しました', 'ok');
+  } catch (err) { toast('同期エラー: ' + err.message, 'err'); }
+}
+async function githubDownload() {
+  const g = state.settings.github; const token = (g.token || '').trim();
+  if (!token) { toast('トークンを入れてね', 'err'); return; }
+  if (!g.gistId) { toast('Gist IDが必要です', 'err'); return; }
+  if (!confirm('Gistのデータを取得して、この端末に反映します。よろしいですか?')) return;
+  toast('取得中…');
+  try {
+    const res = await fetch('https://api.github.com/gists/' + g.gistId, { headers: ghHeaders(token) });
+    if (res.status === 401) throw new Error('トークンが無効です');
+    if (res.status === 404) throw new Error('Gistが見つかりません');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const j = await res.json();
+    const file = j.files && j.files[GIST_FILE];
+    if (!file) throw new Error('データファイルがありません');
+    let content = file.content;
+    if (file.truncated && file.raw_url) content = await (await fetch(file.raw_url)).text();
+    await restoreBackup(JSON.parse(content), { merge: true });
+    g.lastSync = Date.now(); save(false);
+    renderAll(); toast('⬇ 取得しました', 'ok');
+  } catch (err) { toast('取得エラー: ' + err.message, 'err'); }
+}
+let autoSyncTimer = null;
+function scheduleAutoSync() { clearTimeout(autoSyncTimer); autoSyncTimer = setTimeout(() => githubUpload(true), 4000); }
+$('ghUp').onclick = () => { state.settings.github.token = $('ghToken').value.trim(); state.settings.github.gistId = $('ghGist').value.trim(); githubUpload(false); };
+$('ghDown').onclick = () => { state.settings.github.token = $('ghToken').value.trim(); state.settings.github.gistId = $('ghGist').value.trim(); githubDownload(); };
+
+/* ===================== 可視性 ===================== */
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { if (state.timer) ensureTick(); if (curView === 'today') renderToday(); } });
+
+/* ===================== 起動 ===================== */
+(async function init() {
+  try { await openDB(); } catch (e) {}
+  showView('today');
+  renderBadges();
+  if (state.timer) ensureTick();
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+})();
+window.openBookSheet = openBookSheet; window.openLogSheet = openLogSheet;
+window.quickDone = quickDone; window.startTimer = startTimer; window.stopTimer = stopTimer;
+</script>
+</body>
+</html>

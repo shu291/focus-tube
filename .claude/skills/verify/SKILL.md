@@ -73,3 +73,25 @@ python3 -m http.server 8399 --bind 127.0.0.1 &   # 対象: http://127.0.0.1:8399
   **非ASCII(日本語の引き出し名)だと "download" を返す**。ファイル名検証は
   `HTMLAnchorElement.prototype.click` を差し替えて実際の `download` 属性を捕捉する
 - ハマりどころ: Playwright の `download.suggestedFilename` は**メソッド**(要 `()`)
+
+## study-planner(逆算プランナー)
+
+参考書の「いつまでに・どれだけ」から1日のノルマを逆算する学習計画アプリ。外部API依存は
+GitHub Gist(同期)のみで、通常操作の検証にはネットワーク不要。
+
+- `node e2e-study-planner.mjs`(31チェック)。空状態 → 参考書追加 → 今日のノルマ逆算
+  (総量100/締切+9日=10単語)→ ✓できた/記入/計測 → 計画タブ(進捗・状態・バーンダウンSVG)→
+  記録タブ(日別グラフ7本・ヒートマップ・教科別)→ 書き出しJSON → リロード永続化 →
+  **サボり再計算**(締切を縮めるとノルマが増える)を網羅
+- `node e2e-study-planner-sync.mjs`(11チェック)。`api.github.com` を `ctx.route` でモックし、
+  アップロード(POST→gistId保存)→ 自動同期(変更でPATCH、**debounce 4s** を待つ)→
+  取得(GET→復元)→ 空トークンのトースト警告 を検証
+- **必ず踏む逆算の検証**: `今日のノルマ = ⌈今日開始時点の残量 ÷ 今日から締切までの勉強日数⌉`。
+  日を跨がずに確認するには localStorage を直接編集して `deadline` を縮め、リロード後の
+  `.tbook .goal .q` を見る(例: 残量100・締切today+4=5日 → 20)
+- ハマりどころ: `hidden` 属性は `.fab`/`.cnt`/`.btn` の `display:flex/inline-flex` に負ける。
+  グローバルに `[hidden]{display:none!important}` を入れてある(バッジ・FAB・シート内ボタンの
+  出し分けがこれに依存)。E2Eの「未達バッジが消える」がこの回帰を踏む
+- 相対 `shots/` に出力。`node_modules` はこのディレクトリに無いので、実行時だけ
+  `ln -sfn /opt/node22/lib/node_modules node_modules`(グローバルにplaywright有り)を張って走らせ、
+  後片付けする
