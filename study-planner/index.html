@@ -1255,13 +1255,7 @@ $('impFile').onchange = async e => {
   } catch (err) { toast('読み込めません: ' + err.message, 'err'); }
 };
 $('wipeBtn').onclick = async () => {
-  if (isTestMode()) {
-    // テスト中はサンドボックスだけを空に(共有の写真=本番の表紙は消さない)
-    if (!confirm('サンドボックス(テスト用)のデータを空にしますか?本番データは消えません。')) return;
-    state.books = []; state.logs = {}; state.timer = null; stopTick();
-    save(false); renderAll(); toast('サンドボックスを空にしました');
-    return;
-  }
+  if (isTestMode()) { clearSandbox(); return; } // テスト中はサンドボックスだけ(本番・写真は無事)
   if (!confirm('参考書・記録・写真をすべて削除します。よろしいですか?')) return;
   if (!confirm('本当に削除しますか?この操作は取り消せません。')) return;
   state.books = []; state.logs = {}; state.timer = null; stopTick();
@@ -1367,6 +1361,25 @@ function copyRealIntoSandbox() {
   state = copy; stopTick();
   save(false); renderAll(); toast('本番データをコピーしました', 'ok');
 }
+// テストデータをまっさらに(テストモードは継続。本番は無事)
+function clearSandbox() {
+  if (!isTestMode()) return;
+  if (!confirm('テスト用のデータをまっさらに消しますか?\n(本番データは消えません)')) return;
+  state.books = []; state.logs = {}; state.timer = null; stopTick();
+  save(false); renderAll(); toast('テストをまっさらにしました', 'ok');
+}
+// テストを終了し、サンドボックスを丸ごと削除して痕跡を残さない
+function discardTestAndExit() {
+  if (!isTestMode()) return;
+  if (!confirm('テストデータを完全に削除して本番に戻りますか?\n(次に入るときは本番のコピーから作り直します)')) return;
+  if (state.timer) stopTick();
+  ACTIVE_KEY = LS_KEY; FAKE_TODAY = null;
+  try { localStorage.removeItem(TEST_KEY); } catch (e) {}
+  state = loadStore(LS_KEY);
+  saveSession();
+  if (state.timer) ensureTick();
+  renderAll(); showView(curView); toast('テストデータを削除しました', 'ok');
+}
 
 /* 仮の今日を操作 */
 function setFakeToday(k) { if (!isTestMode()) return; FAKE_TODAY = k || realToday(); saveSession(); renderAll(); }
@@ -1442,10 +1455,15 @@ function renderTestPanel() {
       '<button class="btn" id="tSeedAhead">前倒し例</button>' +
       '<button class="btn" id="tSeedMany">大量の記録</button>' +
     '</div>' +
-    '<div class="btnrow" style="margin-top:14px">' +
+    '<h4>リセット / 終了</h4>' +
+    '<div class="tgrid">' +
+      '<button class="btn danger" id="tClear">🧹 まっさらに消す</button>' +
       '<button class="btn" id="tRecopy">実データを再コピー</button>' +
-      '<button class="btn pri" id="tExit">本番に戻る</button>' +
-    '</div>';
+      '<button class="btn danger" id="tDiscard">🗑 全消去して終了</button>' +
+    '</div>' +
+    '<button class="btn pri block" id="tExit" style="margin-top:9px">本番に戻る(テストは残す)</button>' +
+    '<div class="hint" style="margin-top:8px">「まっさらに消す」= テストの中身だけ空に(すぐ実験を作り直せる)。' +
+    '「全消去して終了」= テストデータを丸ごと削除して本番へ。どちらも<b>本番データは無事</b>です。</div>';
   $('tDate').onchange = e => setFakeToday(e.target.value);
   p.querySelectorAll('[data-shift]').forEach(b => b.onclick = () => shiftFakeToday(parseInt(b.dataset.shift)));
   $('tResetDay').onclick = () => setFakeToday(null);
@@ -1453,7 +1471,9 @@ function renderTestPanel() {
   $('tSeedBehind').onclick = seedBehind;
   $('tSeedAhead').onclick = seedAhead;
   $('tSeedMany').onclick = seedManyLogs;
+  $('tClear').onclick = clearSandbox;
   $('tRecopy').onclick = copyRealIntoSandbox;
+  $('tDiscard').onclick = discardTestAndExit;
   $('tExit').onclick = exitTestMode;
 }
 
