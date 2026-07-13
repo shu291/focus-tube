@@ -1,0 +1,17 @@
+{
+  "name": "逆算プランナー",
+  "short_name": "逆算プランナー",
+  "description": "参考書ごとに「いつまでに・どれだけ終わらせる」を決めると、残量と残り日数から1日にやる量と目安時間を逆算。サボった分は自動で残りの日に上乗せ。今日ぴったりできたら✓、違えば量と時間を記入。写真つき・GitHubバックアップ対応。",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d1117",
+  "theme_color": "#0d1117",
+  "icons": [
+    { "src": "../icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "../icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "../icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "../icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
