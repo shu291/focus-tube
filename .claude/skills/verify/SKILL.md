@@ -98,6 +98,21 @@ GitHub Gist(同期)のみで、通常操作の検証にはネットワーク不�
 - **HTTPサーバーはBashの `run_in_background:true` で起動する**。`(python3 ... &)` はセッションを
   跨ぐと回収されて `curl` が `000` になる(ハマった)
 
+### 学習報告 / さかのぼり記録 / データ耐性
+
+- `node e2e-study-planner-report.mjs`(30チェック)。①壊れたlocalStorage(配列でないbooks・
+  実在しない日付キー・型ずれの記録・壊れたtimer)で起動→サニタイズされること、
+  ②保存ボタン3連打で1冊しか増えないこと、③記入シートの`#logDate`で昨日に切り替えて
+  20単語/30分を記録→`logs[昨日]`に入り**今日のノルマが再計算**((100-20)÷10日=8)、
+  `startDate`がさかのぼった日まで伸びること、④`#todayHero`の「学習報告を出す」→
+  `#reportSheet`の報告文(教科:参考書名・量・時間・※メモ・合計)、日付切替、
+  クリップボードへのコピー(`ctx.grantPermissions(['clipboard-read','clipboard-write'])`が必要)を網羅
+- 日付キーの検証は**形式(regex)だけでなく実在チェック**(`validDayKey`: keyToDate→dayKey の
+  往復一致)。`2026-13-99` は形式は合うが実在しないので弾かれる — テストで踏む
+- ハマりどころ: 表紙写真なしの保存はawaitを通らず**同期で完走する**ため、`disabled`だけの
+  連打ガードは効かない(finallyが即座に再有効化する)。閉じた後の再タップは
+  `bookCtx = null` で無効化している — 連打回帰はここを見る
+
 ### 「今日から毎日 あと何時間」指標
 
 - `node e2e-study-planner-pace.mjs`(12チェック)。`calcBook` の `reqMinPerDay`(=残量÷残り勉強日数×
