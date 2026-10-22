@@ -124,6 +124,18 @@ header .badge{font-size:12px;color:var(--sub);border:1px solid var(--line);borde
 #srcMsg.err{color:var(--err)}
 #srcRecent{display:flex;flex-direction:column;gap:6px;margin-top:10px}
 #srcRecent .rc{background:var(--panel2);border:1px solid var(--line);color:var(--sub);border-radius:8px;padding:8px 10px;font-size:12px;text-align:left;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#listCard,#vidStats{margin-top:12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 14px}
+#listCard .lbl,#vidStats .lbl{font-size:11px;color:var(--sub);letter-spacing:.04em;margin-bottom:10px}
+.vrow{display:flex;align-items:center;gap:10px;padding:7px 4px;border-top:1px solid var(--line);cursor:pointer}
+.vrow:first-of-type{border-top:none}
+.vrow.cur{background:var(--accent-dim);border-radius:8px}
+.vrow.bad{opacity:.45}
+.vrow img{width:72px;height:40px;object-fit:cover;border-radius:5px;background:#000;flex:none}
+.vrow .no{font-size:11px;color:var(--sub);width:22px;text-align:right;flex:none}
+.vrow .tt{flex:1;min-width:0;font-size:12.5px;line-height:1.4;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.vrow .st{font-size:11px;color:var(--sub);text-align:right;flex:none;font-variant-numeric:tabular-nums;line-height:1.5}
+.vrow .st b{color:var(--accent);font-weight:700}
+#vidStats .vrow{cursor:default}
 #fsBtn{background:var(--accent);color:#06121c;border-color:var(--accent);font-weight:700}
 </style>
 </head>
@@ -154,6 +166,11 @@ header .badge{font-size:12px;color:var(--sub);border:1px solid var(--line);borde
     <div id="srcRecent"></div>
   </div>
 
+  <div id="listCard" hidden>
+    <div class="lbl" id="listLbl">▶ 再生リスト</div>
+    <div id="listRows"></div>
+  </div>
+
   <div id="subjCard">
     <div class="lbl">📚 いまの教科</div>
     <div id="subjBtns"></div>
@@ -174,6 +191,10 @@ header .badge{font-size:12px;color:var(--sub);border:1px solid var(--line);borde
     </div>
     <div id="chart"></div>
     <div id="chartLegend"></div>
+  </div>
+  <div id="vidStats">
+    <div class="lbl">🎞 動画ごとの記録(再生回数・視聴時間)</div>
+    <div id="vidRows"></div>
   </div>
   <div id="resetWrap"><button id="resetBtn">記録をリセット</button></div>
 </div>
@@ -238,6 +259,18 @@ try{ days = JSON.parse(localStorage.getItem(DAYS_KEY)) || {}; }catch(e){ days = 
 let lastCT = null, lastWall = null, statsTimer = null, rafId = null, shownSec = -1, chartMode = 'day';
 
 const dayKey = d => (d || new Date()).toLocaleDateString('sv'); // YYYY-MM-DD(ローカル日付)
+/* ---- 動画ごとの記録 { id: {title, plays, sec} } ---- */
+const VID_KEY = 'focusTube.videos';
+let vids = {};
+try{ vids = JSON.parse(localStorage.getItem(VID_KEY)) || {}; }catch(e){ vids = {}; }
+function saveVids(){ try{ localStorage.setItem(VID_KEY, JSON.stringify(vids)); }catch(e){} }
+function vrec(id){ return vids[id] || (vids[id] = { title:'', plays:0, sec:0 }); }
+let errStreak = 0;               // 連続で再生できなかった本数
+let countedId = null;            // 今の再生で「1回」を数え済みの動画ID
+const badIds = new Set();        // 埋め込み不可で再生できなかった動画ID
+const titleCache = {};           // id -> タイトル
+function esc(t){ return String(t).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])); }
+
 function saveDays(){ try{ localStorage.setItem(DAYS_KEY, JSON.stringify(days)); }catch(e){} }
 
 /* ---- 教科ごとの記録 ---- */
@@ -282,6 +315,7 @@ function accumulate(){
       days[k] = (days[k] || 0) + add; saveDays();
       const sd = subjDays[k] || (subjDays[k] = {});
       sd[curSubj] = (sd[curSubj] || 0) + add; saveSubj();
+      if (FIXED_ID){ vrec(FIXED_ID).sec += add; saveVids(); }
     }
   }
   lastCT = ct; lastWall = now;
@@ -451,6 +485,76 @@ function renderStats(){
   $('streakV').innerHTML = calcStreak() + '<small>日</small>';
   renderSubjBreak();
   renderChart();
+  renderVidStats();
+}
+
+function fmtMin(sec){
+  sec = Math.floor(sec);
+  if (sec >= 3600) return Math.floor(sec/3600) + '時間' + Math.floor(sec%3600/60) + '分';
+  if (sec >= 60) return Math.floor(sec/60) + '分' + (sec%60) + '秒';
+  return sec + '秒';
+}
+function vidTitle(id){ return (vids[id] && vids[id].title) || titleCache[id] || ('動画 ' + id); }
+function renderVidStats(){
+  const rows = Object.keys(vids).filter(id => vids[id].plays > 0 || vids[id].sec >= 1)
+    .sort((a,b) => vids[b].sec - vids[a].sec);
+  $('vidRows').innerHTML = rows.length ? rows.map(id =>
+    '<div class="vrow"><img loading="lazy" src="https://i.ytimg.com/vi/'+id+'/mqdefault.jpg" alt="">'+
+    '<div class="tt">'+esc(vidTitle(id))+'</div>'+
+    '<div class="st"><b>'+vids[id].plays+'回</b><br>'+fmtMin(vids[id].sec)+'</div></div>').join('')
+    : '<div style="font-size:12.5px;color:var(--sub)">まだ記録がありません</div>';
+}
+
+// 再生リストの一覧(タップで再生)
+let listIds = [];
+function renderList(){
+  let ids = [];
+  try{ ids = (src.list && player && player.getPlaylist && player.getPlaylist()) || []; }catch(e){}
+  listIds = ids;
+  $('listCard').hidden = !ids.length;
+  if (!ids.length) return;
+  let cur = -1; try{ cur = player.getPlaylistIndex(); }catch(e){}
+  $('listLbl').textContent = '▶ 再生リスト(' + ids.length + '本)';
+  $('listRows').innerHTML = ids.map((id, i) => {
+    const r = vids[id];
+    return '<div class="vrow'+(i===cur?' cur':'')+(badIds.has(id)?' bad':'')+'" data-i="'+i+'">'+
+      '<span class="no">'+(i+1)+'</span>'+
+      '<img loading="lazy" src="https://i.ytimg.com/vi/'+id+'/mqdefault.jpg" alt="">'+
+      '<div class="tt">'+esc(vidTitle(id))+(badIds.has(id)?'(再生不可)':'')+'</div>'+
+      '<div class="st">'+(r && r.plays ? '<b>'+r.plays+'回</b><br>'+fmtMin(r.sec) : '')+'</div></div>';
+  }).join('');
+  document.querySelectorAll('#listRows .vrow').forEach(el => {
+    el.onclick = () => {
+      $('poster').classList.add('hide');
+      if (bgEnabled) silence.play().catch(()=>{});
+      countedId = null;
+      try{ player.playVideoAt(+el.dataset.i); }catch(e){}
+      window.scrollTo({ top:0, behavior:'smooth' });
+    };
+  });
+  fillTitles(ids);
+}
+// 一覧のタイトルを(1本ずつ控えめに)取得して保存
+let titleBusy = false;
+async function fillTitles(ids){
+  if (titleBusy) return; titleBusy = true;
+  let changed = false;
+  for (const id of ids.slice(0, 200)){
+    if (vidTitle(id) !== '動画 ' + id) continue;
+    try{
+      const r = await fetch('https://noembed.com/embed?url=https://www.youtube.com/watch?v=' + id);
+      const j = await r.json();
+      if (j.title){ titleCache[id] = j.title; if (vids[id]) vids[id].title = j.title; changed = true; }
+    }catch(e){}
+    if (changed) { changed = false; patchTitles(); }
+  }
+  titleBusy = false; saveVids();
+}
+function patchTitles(){
+  document.querySelectorAll('#listRows .vrow').forEach(el => {
+    const id = listIds[+el.dataset.i];
+    el.querySelector('.tt').textContent = vidTitle(id) + (badIds.has(id) ? '(再生不可)' : '');
+  });
 }
 
 /* ===================== YouTube IFRAME API ===================== */
@@ -466,7 +570,7 @@ function createPlayer(){
   const vars = { rel:0, playsinline:1, iv_load_policy:3, modestbranding:1 };
   if (src.list){ vars.listType = 'playlist'; vars.list = src.list; }
   const opts = { playerVars: vars, events: {
-      onReady: () => { updateTitle(); },
+      onReady: () => { playerReady = true; if (pendingCue) cueCurrent(); else { updateTitle(); renderList(); } },
       onStateChange: onState,
       onError: onError
   }};
@@ -484,17 +588,17 @@ function updatePoster(){
 
 // 読み込んだ動画/リストに切り替える(自動再生はしない。ポスターをタップで開始)
 function loadSource(s){
-  src = s; FIXED_ID = s.video || FIXED_ID;
+  src = s; FIXED_ID = s.video || FIXED_ID; countedId = null;
   try{ localStorage.setItem(SRC_KEY, JSON.stringify(s)); }catch(e){}
   if (statsTimer) accumulate();
   updatePoster();
-  if (!player || !player.loadPlaylist) return;
-  if (s.list){
-    player.cuePlaylist({ listType:'playlist', list:s.list, index:0 });
-  } else {
-    player.cueVideoById(s.video);
-  }
   $('vTitle').textContent = '読み込み中…';
+  if (playerReady) cueCurrent(); else pendingCue = true;   // 準備前に選ばれた場合は onReady で読み込む
+}
+let playerReady = false, pendingCue = false;
+function cueCurrent(){
+  if (src.list) player.cuePlaylist({ listType:'playlist', list:src.list, index:0 });
+  else player.cueVideoById(src.video);
 }
 
 function saveRecent(s, title){
@@ -533,9 +637,15 @@ $('poster').onclick = () => {
 };
 
 function onState(e){
-  if (e.data === YT.PlayerState.PLAYING || e.data === YT.PlayerState.CUED) updateTitle();
+  if (e.data === YT.PlayerState.PLAYING || e.data === YT.PlayerState.CUED){ updateTitle(); renderList(); }
+  if (e.data === YT.PlayerState.PLAYING) errStreak = 0;
   if (e.data === YT.PlayerState.PLAYING){
     isPlaying = true;
+    if (FIXED_ID && countedId !== FIXED_ID){
+      countedId = FIXED_ID;
+      const r = vrec(FIXED_ID); r.plays++; r.title = currentTitle || r.title; saveVids();
+      renderVidStats(); if (src.list) renderList();
+    }
     $('poster').classList.add('hide');
     $('playPause').textContent = '⏸ 一時停止';
     if (bgEnabled){ startSilence(); acquireWake(); }
@@ -550,7 +660,7 @@ function onState(e){
     accumulate();
     releaseWake();
   } else if (e.data === YT.PlayerState.ENDED){
-    isPlaying = false;
+    isPlaying = false; countedId = null;
     $('playPause').textContent = '▶ 再生';
     stopSilence();
     stopPositionSync();
@@ -560,7 +670,23 @@ function onState(e){
 }
 
 function onError(e){
-  $('vTitle').textContent = 'この動画は再生できませんでした(エラー' + e.data + ')。埋め込み再生が許可されているか確認してください。';
+  // 100:削除/非公開 101・150:埋め込み禁止 など。再生リストなら次の動画へ自動で進む
+  let id = FIXED_ID;
+  try{ const d = player.getVideoData(); if (d && d.video_id) id = d.video_id; }catch(_){}
+  badIds.add(id);
+  if (src.list){
+    let i = -1, n = 0;
+    try{ i = player.getPlaylistIndex(); n = player.getPlaylist().length; }catch(_){}
+    renderList();
+    const atEnd = n > 0 && i >= n - 1;
+    if (!atEnd && ++errStreak <= 30){
+      $('vTitle').textContent = '再生できない動画をスキップします' + (n ? '(' + (i+1) + '/' + n + ')' : '') + '…';
+      setTimeout(() => { try{ player.nextVideo(); }catch(_){} }, 600);
+      return;
+    }
+  }
+  $('poster').classList.add('hide');
+  $('vTitle').textContent = 'この動画は再生できませんでした(エラー' + e.data + ')。埋め込み再生が許可されていない可能性があります。';
 }
 
 // いま再生(待機)中の動画のタイトル・IDをプレーヤーから取得して表示
@@ -577,7 +703,9 @@ function updateTitle(){
       }
       $('vTitle').textContent = t;
       setMediaMetadata();
+      if (d.title){ titleCache[d.video_id] = d.title; if (vids[d.video_id]) vids[d.video_id].title = d.title; }
       if (d.title) saveRecent(src, src.list ? (d.title + ' ほか') : d.title);
+      renderList();
     }
   }catch(e){}
 }
@@ -670,7 +798,7 @@ $('bgToggle').onclick = () => {
   if (bgEnabled && isPlaying){ startSilence(); acquireWake(); }
   else { stopSilence(); releaseWake(); }
 };
-$('replay').onclick = () => { if(player){ player.seekTo(0, true); player.playVideo(); } };
+$('replay').onclick = () => { countedId = null; if(player){ player.seekTo(0, true); player.playVideo(); } };
 // 再生して全画面にする
 $('fsBtn').onclick = () => {
   if (player && player.playVideo) player.playVideo();
@@ -687,6 +815,7 @@ $('resetBtn').onclick = () => {
   if (!confirm('すべての再生記録をリセットしますか?')) return;
   days = {}; saveDays();
   subjDays = {}; saveSubj();
+  vids = {}; saveVids();
   renderStats();
 };
 
