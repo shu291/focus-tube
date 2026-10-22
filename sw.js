@@ -1,7 +1,7 @@
 /* FocusTube Service Worker
    - アプリ本体(HTML/アイコン等)をキャッシュして、ネットがなくても起動できるようにする
 */
-const CACHE = 'focustube-v3';
+const CACHE = 'focustube-v4';
 const SHELL = [
   './',
   './index.html',

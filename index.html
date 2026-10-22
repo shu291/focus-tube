@@ -114,6 +114,16 @@ header .badge{font-size:12px;color:var(--sub);border:1px solid var(--line);borde
 .controls button:active{background:var(--panel)}
 #bgToggle.on{border-color:var(--ok);color:var(--ok)}
 #replay{flex:0 0 auto}
+#srcCard{margin-top:14px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 14px}
+#srcCard .lbl{font-size:11px;color:var(--sub);letter-spacing:.04em;margin-bottom:10px}
+#srcForm{display:flex;gap:8px}
+#srcInput{flex:1;min-width:0;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px 12px;font-size:14px}
+#srcInput:focus{outline:none;border-color:var(--accent)}
+#srcGo{background:var(--accent);color:#06121c;border:none;border-radius:8px;padding:0 16px;font-size:14px;font-weight:700;cursor:pointer}
+#srcMsg{font-size:12px;color:var(--sub);margin-top:8px;min-height:15px}
+#srcMsg.err{color:var(--err)}
+#srcRecent{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+#srcRecent .rc{background:var(--panel2);border:1px solid var(--line);color:var(--sub);border-radius:8px;padding:8px 10px;font-size:12px;text-align:left;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #fsBtn{background:var(--accent);color:#06121c;border-color:var(--accent);font-weight:700}
 </style>
 </head>
@@ -133,6 +143,16 @@ header .badge{font-size:12px;color:var(--sub);border:1px solid var(--line);borde
 
 <div id="info">
   <div id="vTitle">読み込み中…</div>
+
+  <div id="srcCard">
+    <div class="lbl">🔗 動画・再生リストのURL</div>
+    <form id="srcForm">
+      <input id="srcInput" type="text" inputmode="url" autocomplete="off" placeholder="YouTubeの動画 or 再生リストのURL">
+      <button id="srcGo" type="submit">再生</button>
+    </form>
+    <div id="srcMsg"></div>
+    <div id="srcRecent"></div>
+  </div>
 
   <div id="subjCard">
     <div class="lbl">📚 いまの教科</div>
@@ -162,7 +182,9 @@ header .badge{font-size:12px;color:var(--sub);border:1px solid var(--line);borde
   <button id="fsBtn">⛶ 全画面で再生</button>
 </div>
 <div class="controls">
+  <button id="prevBtn" style="flex:0 0 auto">⏮</button>
   <button id="playPause">⏸ 一時停止</button>
+  <button id="nextBtn" style="flex:0 0 auto">⏭</button>
   <button id="bgToggle" class="on">🌙 BG: ON</button>
   <button id="replay">↺ 頭から</button>
 </div>
@@ -172,8 +194,36 @@ header .badge{font-size:12px;color:var(--sub);border:1px solid var(--line);borde
   src="data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQxAADB8AhSmxhIIEVCSiJrDCQBTcu3UrAIwUdkRgQbFAZC1CQEwTJ9mjRvBA4UOLD8nKVOWfh+UlK3z/177OXrfOdKl7pyn3Xf//WreyTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//tQxAADB8AhSmxhIIEVCSiJrDCQBTcu3UrAIwUdkRgQbFAZC1CQEwTJ9mjRvBA4UOLD8nKVOWfh+UlK3z/177OXrfOdKl7pyn3Xf//WreyTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//tQxAADB8AhSmxhIIEVCSiJrDCQBTcu3UrAIwUdkRgQbFAZC1CQEwTJ9mjRvBA4UOLD8nKVOWfh+UlK3z/177OXrfOdKl7pyn3Xf//WreyTEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV"></audio>
 
 <script>
-// ▼ 固定する勉強用BGM動画ID(https://youtu.be/vr9dLvJs7VE)
-const FIXED_ID = 'vr9dLvJs7VE';
+// 既定の勉強用BGM動画(https://youtu.be/vr9dLvJs7VE)。URL欄で動画・再生リストに切り替えられる
+const DEFAULT_SRC = { video:'vr9dLvJs7VE', list:null };
+const SRC_KEY = 'focusTube.source';
+const RECENT_KEY = 'focusTube.recent';
+let src = DEFAULT_SRC, recent = [];
+try{ const j = JSON.parse(localStorage.getItem(SRC_KEY)); if (j && (j.video || j.list)) src = j; }catch(e){}
+try{ recent = JSON.parse(localStorage.getItem(RECENT_KEY)) || []; }catch(e){ recent = []; }
+let FIXED_ID = src.video || DEFAULT_SRC.video; // アートワーク用(いま再生中の動画ID)
+
+// URL(または11桁ID / PLから始まるID)から動画ID・再生リストIDを取り出す
+function parseSource(text){
+  text = (text || '').trim();
+  if (!text) return null;
+  let video = null, list = null;
+  try{
+    const u = new URL(/^https?:\/\//i.test(text) ? text : 'https://' + text);
+    list = u.searchParams.get('list');
+    video = u.searchParams.get('v');
+    if (!video && /(^|\.)youtu\.be$/.test(u.hostname)) video = u.pathname.slice(1).split('/')[0];
+    if (!video){ const m = u.pathname.match(/^\/(?:embed|shorts|live)\/([\w-]{11})/); if (m) video = m[1]; }
+  }catch(e){}
+  if (!video && !list){
+    if (/^[\w-]{11}$/.test(text)) video = text;
+    else if (/^(PL|UU|OL|FL|RD)[\w-]+$/.test(text)) list = text;
+  }
+  if (video && !/^[\w-]{11}$/.test(video)) video = null;
+  if (list && !/^[\w-]+$/.test(list)) list = null;
+  if (list && list.startsWith('RD')) list = null; // ミックスリストは埋め込み不可のため動画のみ扱う
+  return (video || list) ? { video, list } : null;
+}
 
 let player = null, apiReady = false;
 let currentTitle = '';
@@ -413,17 +463,68 @@ window.onYouTubeIframeAPIReady = function(){
 };
 
 function createPlayer(){
-  fetchTitle(FIXED_ID);
-  player = new YT.Player('player', {
-    videoId: FIXED_ID,
-    playerVars: { rel:0, playsinline:1, iv_load_policy:3, modestbranding:1 },
-    events: {
-      onReady: () => {}, // 自動再生はしない(ポスターのタップ or 全画面ボタンで開始)
+  const vars = { rel:0, playsinline:1, iv_load_policy:3, modestbranding:1 };
+  if (src.list){ vars.listType = 'playlist'; vars.list = src.list; }
+  const opts = { playerVars: vars, events: {
+      onReady: () => { updateTitle(); },
       onStateChange: onState,
       onError: onError
-    }
+  }};
+  if (src.video && !src.list) opts.videoId = src.video;
+  player = new YT.Player('player', opts);
+  updatePoster();
+}
+
+function updatePoster(){
+  const p = $('poster');
+  p.style.backgroundImage = src.video ? "url('https://i.ytimg.com/vi/"+src.video+"/hqdefault.jpg')" : 'none';
+  p.style.backgroundColor = '#10151d';
+  p.classList.remove('hide');
+}
+
+// 読み込んだ動画/リストに切り替える(自動再生はしない。ポスターをタップで開始)
+function loadSource(s){
+  src = s; FIXED_ID = s.video || FIXED_ID;
+  try{ localStorage.setItem(SRC_KEY, JSON.stringify(s)); }catch(e){}
+  if (statsTimer) accumulate();
+  updatePoster();
+  if (!player || !player.loadPlaylist) return;
+  if (s.list){
+    player.cuePlaylist({ listType:'playlist', list:s.list, index:0 });
+  } else {
+    player.cueVideoById(s.video);
+  }
+  $('vTitle').textContent = '読み込み中…';
+}
+
+function saveRecent(s, title){
+  const key = (s.list ? 'L:' + s.list : 'V:' + s.video);
+  recent = recent.filter(r => r.key !== key);
+  recent.unshift({ key, video:s.video, list:s.list, title: title || key });
+  recent = recent.slice(0, 5);
+  try{ localStorage.setItem(RECENT_KEY, JSON.stringify(recent)); }catch(e){}
+  renderRecent();
+}
+function renderRecent(){
+  $('srcRecent').innerHTML = recent.map((r, i) =>
+    '<button class="rc" data-i="'+i+'">'+(r.list ? '📃 ' : '▶ ')+String(r.title).replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))+'</button>').join('');
+  document.querySelectorAll('#srcRecent .rc').forEach(b => {
+    b.onclick = () => { const r = recent[+b.dataset.i]; loadSource({ video:r.video, list:r.list }); };
   });
 }
+function setSrcMsg(t, err){ $('srcMsg').textContent = t || ''; $('srcMsg').classList.toggle('err', !!err); }
+
+$('srcForm').onsubmit = ev => {
+  ev.preventDefault();
+  const s = parseSource($('srcInput').value);
+  if (!s){ setSrcMsg('URLを読み取れませんでした。YouTubeの動画か再生リストのURLを貼ってください。', true); return; }
+  setSrcMsg(s.list ? '再生リストを読み込みました。▶を押すと始まります。' : '動画を読み込みました。▶を押すと始まります。');
+  $('srcInput').value = '';
+  loadSource(s);
+};
+$('prevBtn').onclick = () => { if (player && player.previousVideo) player.previousVideo(); };
+$('nextBtn').onclick = () => { if (player && player.nextVideo) player.nextVideo(); };
+renderRecent();
 
 // サムネイル+再生ボタン。タップで確実に再生を開始する
 $('poster').onclick = () => {
@@ -432,6 +533,7 @@ $('poster').onclick = () => {
 };
 
 function onState(e){
+  if (e.data === YT.PlayerState.PLAYING || e.data === YT.PlayerState.CUED) updateTitle();
   if (e.data === YT.PlayerState.PLAYING){
     isPlaying = true;
     $('poster').classList.add('hide');
@@ -461,16 +563,23 @@ function onError(e){
   $('vTitle').textContent = 'この動画は再生できませんでした(エラー' + e.data + ')。埋め込み再生が許可されているか確認してください。';
 }
 
-async function fetchTitle(id){
+// いま再生(待機)中の動画のタイトル・IDをプレーヤーから取得して表示
+function updateTitle(){
   try{
-    const r = await fetch('https://noembed.com/embed?url=https://www.youtube.com/watch?v=' + id);
-    const j = await r.json();
-    currentTitle = j.title || ('動画 ' + id);
-  }catch(e){
-    currentTitle = '動画 ' + id;
-  }
-  $('vTitle').textContent = currentTitle;
-  setMediaMetadata();
+    const d = player.getVideoData();
+    if (d && d.video_id){
+      FIXED_ID = d.video_id;
+      currentTitle = d.title || ('動画 ' + d.video_id);
+      let t = currentTitle;
+      if (src.list){
+        const i = player.getPlaylistIndex(), n = (player.getPlaylist() || []).length;
+        if (i >= 0 && n) t = '(' + (i+1) + '/' + n + ') ' + t;
+      }
+      $('vTitle').textContent = t;
+      setMediaMetadata();
+      if (d.title) saveRecent(src, src.list ? (d.title + ' ほか') : d.title);
+    }
+  }catch(e){}
 }
 
 /* ---- バックグラウンド再生の安定化 ---- */
